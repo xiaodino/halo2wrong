@@ -170,7 +170,6 @@ mod tests {
     use crate::maingate::{MainGateInstructions, RegionCtx};
     use crate::transcript::LimbRepresentation;
     use ecc::halo2::arithmetic::CurveAffine;
-    use ecc::integer::NUMBER_OF_LOOKUP_LIMBS;
     use ecc::maingate::RangeChip;
     use ecc::maingate::RangeConfig;
     use ecc::maingate::RangeInstructions;
@@ -199,10 +198,15 @@ mod tests {
             let rns = BaseFieldEccChip::<C, NUMBER_OF_LIMBS, BIT_LEN_LIMB>::rns();
 
             let main_gate_config = MainGate::<C::Scalar>::configure(meta);
-            let mut overflow_bit_lengths: Vec<usize> = vec![];
-            overflow_bit_lengths.extend(rns.overflow_lengths());
-            let range_config =
-                RangeChip::<C::Scalar>::configure(meta, &main_gate_config, overflow_bit_lengths);
+            let overflow_bit_lens = rns.overflow_lengths();
+            let composition_bit_lens = vec![BIT_LEN_LIMB / NUMBER_OF_LIMBS];
+
+            let range_config = RangeChip::<C::Scalar>::configure(
+                meta,
+                &main_gate_config,
+                composition_bit_lens,
+                overflow_bit_lens,
+            );
             TestCircuitConfig {
                 main_gate_config,
                 range_config,
@@ -210,10 +214,9 @@ mod tests {
         }
 
         fn config_range<N: FieldExt>(&self, layouter: &mut impl Layouter<N>) -> Result<(), Error> {
-            let bit_len_lookup = BIT_LEN_LIMB / NUMBER_OF_LOOKUP_LIMBS;
-            let range_chip = RangeChip::<N>::new(self.range_config.clone(), bit_len_lookup);
-            range_chip.load_limb_range_table(layouter)?;
-            range_chip.load_overflow_range_tables(layouter)?;
+            let range_chip = RangeChip::<N>::new(self.range_config.clone());
+            range_chip.load_composition_tables(layouter)?;
+            range_chip.load_overflow_tables(layouter)?;
 
             Ok(())
         }
