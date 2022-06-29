@@ -21,6 +21,10 @@ pub fn fe_to_big<F: FieldExt>(fe: F) -> big_uint {
     big_uint::from_bytes_le(fe.to_repr().as_ref())
 }
 
+pub fn from_hex<F: FieldExt>(fe: &str) -> F {
+    big_to_fe::<F>(big_uint::from_str_radix(fe, 16).unwrap())
+}
+
 pub fn decompose<F: FieldExt>(e: F, number_of_limbs: usize, bit_len: usize) -> Vec<F> {
     decompose_big(fe_to_big(e), number_of_limbs, bit_len)
 }
