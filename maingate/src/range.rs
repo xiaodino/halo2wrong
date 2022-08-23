@@ -444,4 +444,133 @@ mod tests {
         };
         assert_eq!(prover.verify(), Ok(()));
     }
+
+    //////
+
+    #[derive(Clone, Debug)]
+    struct TestToBytesConfig {
+        range_config: RangeConfig,
+    }
+
+    impl TestToBytesConfig {
+        fn new<F: FieldExt>(meta: &mut ConstraintSystem<F>) -> Self {
+            let main_gate_config = MainGate::<F>::configure(meta);
+
+            let range_config = RangeChip::<F>::configure(meta, &main_gate_config, vec![8], vec![]);
+            Self { range_config }
+        }
+
+        fn main_gate<F: FieldExt>(&self) -> MainGate<F> {
+            MainGate::<F>::new(self.range_config.main_gate_config.clone())
+        }
+
+        fn range_chip<F: FieldExt>(&self) -> RangeChip<F> {
+            RangeChip::<F>::new(self.range_config.clone())
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct ToBytesInput<F: FieldExt> {
+        byte_len: usize,
+        value: Option<F>,
+    }
+
+    #[derive(Default, Clone, Debug)]
+    struct TestToBytes<F: FieldExt> {
+        inputs: Vec<ToBytesInput<F>>,
+    }
+
+    impl<F: FieldExt> Circuit<F> for TestToBytes<F> {
+        type Config = TestToBytesConfig;
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
+
+        fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+            TestToBytesConfig::new(meta)
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<F>,
+        ) -> Result<(), Error> {
+            let range_chip = config.range_chip();
+            let main_gate = config.main_gate();
+
+            layouter.assign_region(
+                || "region 0",
+                |mut region| {
+                    let offset = &mut 0;
+                    let ctx = &mut RegionCtx::new(&mut region, offset);
+
+                    for input in self.inputs.iter() {
+                        let value = input.value;
+                        let byte_len = input.byte_len;
+
+                        let value = UnassignedValue(value);
+                        let a_0 = main_gate.assign_value(ctx, &value)?;
+                        let (a_1, decomposed) =
+                            range_chip.decompose(ctx, &value, 8, byte_len * 8)?;
+
+                        main_gate.assert_equal(ctx, &a_0, &a_1)?;
+
+                        let bases = RangeChip::<F>::bases(byte_len, 8);
+                        assert_eq!(bases.len(), decomposed.len());
+
+                        let terms: Vec<Term<F>> = bases
+                            .iter()
+                            .zip(decomposed.iter())
+                            .map(|(base, limb)| Term::Assigned(*limb, *base))
+                            .collect();
+                        let a_1 = main_gate.compose(ctx, &terms[..], F::zero())?;
+                        main_gate.assert_equal(ctx, &a_0, &a_1)?;
+                    }
+
+                    Ok(())
+                },
+            )?;
+
+            range_chip.load_composition_tables(&mut layouter)?;
+            range_chip.load_overflow_tables(&mut layouter)?;
+
+            Ok(())
+        }
+    }
+
+    use rand::SeedableRng;
+    use rand_core::RngCore;
+    use rand_xorshift::XorShiftRng;
+
+    fn rand_f<F: FieldExt>(rng: impl RngCore, byte_len: usize) -> F {
+        let v = F::random(rng);
+        let mut v_repr = v.to_repr();
+        let v_bytes = v_repr.as_mut();
+        for b in v_bytes[byte_len..].iter_mut() {
+            *b = 0
+        }
+        F::from_repr(v_repr).unwrap()
+    }
+
+    #[test]
+    fn test_range_to_bytes() {
+        let k: u32 = (8 + 1) as u32;
+
+        let mut rng = XorShiftRng::seed_from_u64(1);
+        let inputs = (2..31)
+            .map(|byte_len| ToBytesInput {
+                value: Some(rand_f(&mut rng, byte_len)),
+                byte_len,
+            })
+            .collect();
+        let circuit = TestToBytes::<Fp> { inputs };
+        let public_inputs = vec![vec![]];
+        let prover = match MockProver::run(k, &circuit, public_inputs) {
+            Ok(prover) => prover,
+            Err(e) => panic!("{:#?}", e),
+        };
+        assert_eq!(prover.verify(), Ok(()));
+    }
 }
