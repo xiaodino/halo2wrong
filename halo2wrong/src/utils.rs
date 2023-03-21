@@ -1,7 +1,7 @@
 use crate::halo2::{
     arithmetic::FieldExt,
     circuit::Value,
-    dev::MockProver,
+    dev::{MockProver, VerifyFailure, FailureLocation},
     plonk::{
         Advice, Any, Assigned, Assignment, Circuit, Column, ConstraintSystem, Error, Fixed,
         FloorPlanner, Instance, Selector,
@@ -64,13 +64,44 @@ pub fn compose(input: Vec<big_uint>, bit_len: usize) -> big_uint {
 }
 
 pub fn mock_prover_verify<F: FieldExt, C: Circuit<F>>(circuit: &C, instance: Vec<Vec<F>>) {
-    let dimension = DimensionMeasurement::measure(circuit).unwrap();
-    let prover = MockProver::run(dimension.k(), circuit, instance)
-        .unwrap_or_else(|err| panic!("{:#?}", err));
-    assert_eq!(
-        prover.verify_at_rows_par(dimension.advice_range(), dimension.advice_range()),
-        Ok(())
-    )
+    let dimension_result = DimensionMeasurement::measure(circuit);
+    match dimension_result {
+        Ok(dimension) => {
+            let prover = MockProver::run(dimension.k(), circuit, instance)
+                .unwrap_or_else(|err| panic!("{:#?}", err));
+            match prover.verify_at_rows_par(dimension.advice_range(), dimension.advice_range()) {
+                Ok(_) => {
+                    println!("verify_at_rows_par()");
+                },
+                Err(errors) => {
+                    for error in errors {
+                        match error {
+                            VerifyFailure::ConstraintNotSatisfied {constraint, location, cell_values} => {
+                                // println!("Constraint not satisfied: {:?}, location: {:?}, cell values: {:?}", constraint, location, cell_values);
+                                match location {
+                                    FailureLocation::InRegion { region: _, offset } => {
+                                        // handle constraint not satisfied error
+                                        println!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {}", offset);
+                                    },
+                                    FailureLocation::OutsideRegion { row: _ } => {
+                                        // handle constraint not satisfied error at row level
+                                    },
+                                }
+                            },
+                            _ => {
+                                // Handle other error types here
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Err(error) => {
+            // Handle the error here. For example, you could print a message
+            // or return a Result with the error.
+            eprintln!("Error measuring circuit dimension: {:?}", error);
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

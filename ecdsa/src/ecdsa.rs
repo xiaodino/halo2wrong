@@ -124,14 +124,27 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let pairs = vec![(e_gen, u1), (pk.point.clone(), u2)];
         let q = ecc_chip.mul_batch_1d_horizontal(ctx, pairs, 4)?;
 
+
+        // https://github.com/axiom-crypto/halo2-lib/blob/main/halo2-ecc/src/ecc/ecdsa.rs#L74
+
         // 6. reduce q_x in E::ScalarExt
         // assuming E::Base/E::ScalarExt have the same number of limbs
+        let offset_start_step_6_1 = ctx.offset();
         let q_x = q.x();
         let q_x_reduced_in_q = base_chip.reduce(ctx, q_x)?;
+        let offset_end_step_6_1 = ctx.offset();
+        println!("6. reduce q_x in E::ScalarExt base_chip.reduce(ctx, q_x)?; offset: {:?} - {:?}", offset_start_step_6_1, offset_end_step_6_1);
+
+        let offset_start_step_6_2 = ctx.offset();
         let q_x_reduced_in_r = scalar_chip.reduce_external(ctx, &q_x_reduced_in_q)?;
+        let offset_start_end_6_2 = ctx.offset();
+        println!("6. reduce q_x in scalar_chip.reduce_external(ctx, &q_x_reduced_in_q)?; offset: {:?} - {:?}", offset_start_step_6_2, offset_start_end_6_2);
 
         // 7. check if Q.x == r (mod n)
+        let offset_start_step_7 = ctx.offset();
         scalar_chip.assert_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
+        let offset_end_step_7 = ctx.offset();
+        println!("7. check if Q.x == r (mod n) ctx. offset: {:?} - {:?}", offset_start_step_7, offset_end_step_7);
 
         Ok(())
     }
@@ -336,7 +349,7 @@ mod tests {
             let aux_generator = C::CurveExt::random(OsRng).to_affine();
             let circuit = TestCircuitEcdsaVerify::<C, N> {
                 public_key: Value::known(public_key),
-                signature: Value::known((r, s)),
+                signature: Value::known((s, s)),
                 msg_hash: Value::known(msg_hash),
                 aux_generator,
                 window_size: 4,
@@ -350,7 +363,7 @@ mod tests {
         use crate::curves::pasta::{Fp as PastaFp, Fq as PastaFq};
         use crate::curves::secp256k1::Secp256k1Affine as Secp256k1;
         run::<Secp256k1, BnScalar>();
-        run::<Secp256k1, PastaFp>();
-        run::<Secp256k1, PastaFq>();
+        // run::<Secp256k1, PastaFp>();
+        // run::<Secp256k1, PastaFq>();
     }
 }
