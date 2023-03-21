@@ -124,9 +124,6 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let pairs = vec![(e_gen, u1), (pk.point.clone(), u2)];
         let q = ecc_chip.mul_batch_1d_horizontal(ctx, pairs, 4)?;
 
-
-        // https://github.com/axiom-crypto/halo2-lib/blob/main/halo2-ecc/src/ecc/ecdsa.rs#L74
-
         // 6. reduce q_x in E::ScalarExt
         // assuming E::Base/E::ScalarExt have the same number of limbs
         let offset_start_step_6_1 = ctx.offset();
