@@ -174,14 +174,6 @@ impl<F: FieldExt> Assignment<F> for DimensionMeasurement {
         Ok(Value::unknown())
     }
 
-    fn annotate_column<A, AR>(&mut self, _annotation: A, _column: Column<Any>)
-    where
-        A: FnOnce() -> AR,
-        AR: Into<String>,
-    {
-        // Do nothing.
-    }
-
     fn assign_advice<V, VR, A, AR>(
         &mut self,
         _: A,
