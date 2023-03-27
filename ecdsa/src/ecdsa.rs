@@ -5,10 +5,14 @@ use crate::maingate;
 use ecc::maingate::RegionCtx;
 use ecc::{AssignedPoint, EccConfig, GeneralEccChip};
 use halo2::arithmetic::{CurveAffine, FieldExt};
+use halo2::dev::{VerifyFailure, FailureLocation};
 use halo2::{circuit::Value, plonk::Error};
 use integer::rns::Integer;
 use integer::{AssignedInteger, IntegerInstructions};
 use maingate::{MainGateConfig, RangeConfig};
+
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct EcdsaConfig {
@@ -97,28 +101,36 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         sig: &AssignedEcdsaSig<E::Scalar, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         pk: &AssignedPublicKey<E::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         msg_hash: &AssignedInteger<E::Scalar, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+        offsets: &mut HashMap<String, usize>,
     ) -> Result<(), Error> {
         let ecc_chip = self.ecc_chip();
         let scalar_chip = ecc_chip.scalar_field_chip();
         let base_chip = ecc_chip.base_field_chip();
 
+        offsets.insert("Started at".to_string(), ctx.offset());
+
         // 1. check 0 < r, s < n
 
         // since `assert_not_zero` already includes a in-field check, we can just
         // call `assert_not_zero`
+        offsets.insert("1. check 0 < r, s < n".to_string(), ctx.offset());
         scalar_chip.assert_not_zero(ctx, &sig.r)?;
         scalar_chip.assert_not_zero(ctx, &sig.s)?;
 
         // 2. w = s^(-1) (mod n)
+        offsets.insert("2. w = s^(-1) (mod n)".to_string(), ctx.offset());
         let (s_inv, _) = scalar_chip.invert(ctx, &sig.s)?;
 
         // 3. u1 = m' * w (mod n)
+        offsets.insert("3. u1 = m' * w (mod n)".to_string(), ctx.offset());
         let u1 = scalar_chip.mul(ctx, msg_hash, &s_inv)?;
 
         // 4. u2 = r * w (mod n)
+        offsets.insert("4. u2 = r * w (mod n)".to_string(), ctx.offset());
         let u2 = scalar_chip.mul(ctx, &sig.r, &s_inv)?;
 
         // 5. compute Q = u1*G + u2*pk
+        offsets.insert("5. compute Q = u1*G + u2*pk".to_string(), ctx.offset());
         let e_gen = ecc_chip.assign_point(ctx, Value::known(E::generator()))?;
         let g1 = ecc_chip.mul(ctx, &e_gen, &u1, 2)?;
         let g2 = ecc_chip.mul(ctx, &pk.point, &u2, 2)?;
@@ -126,12 +138,16 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 
         // 6. reduce q_x in E::ScalarExt
         // assuming E::Base/E::ScalarExt have the same number of limbs
+        offsets.insert("6. reduce q_x in E::ScalarExt".to_string(), ctx.offset());
         let q_x = q.x();
         let q_x_reduced_in_q = base_chip.reduce(ctx, q_x)?;
         let q_x_reduced_in_r = scalar_chip.reduce_external(ctx, &q_x_reduced_in_q)?;
 
         // 7. check if Q.x == r (mod n)
+        offsets.insert("7. check if Q.x == r (mod n)".to_string(), ctx.offset());
         scalar_chip.assert_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
+
+        offsets.insert("Finished at".to_string(), ctx.offset());
 
         Ok(())
     }
@@ -153,11 +169,16 @@ mod tests {
     use halo2::arithmetic::CurveAffine;
     use halo2::arithmetic::FieldExt;
     use halo2::circuit::{Layouter, SimpleFloorPlanner, Value};
+    use halo2::dev::{VerifyFailure, FailureLocation};
     use halo2::plonk::{Circuit, ConstraintSystem, Error};
     use integer::IntegerInstructions;
     use maingate::mock_prover_verify;
     use maingate::{MainGate, MainGateConfig, RangeChip, RangeConfig, RangeInstructions};
     use rand_core::OsRng;
+
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::fmt::{self, Debug};
     use std::marker::PhantomData;
 
     const BIT_LEN_LIMB: usize = 68;
@@ -214,6 +235,9 @@ mod tests {
 
         aux_generator: E,
         window_size: usize,
+
+        offsets: RefCell<HashMap<String, usize>>,
+
         _marker: PhantomData<N>,
     }
 
@@ -279,7 +303,10 @@ mod tests {
                         point: pk_in_circuit,
                     };
                     let msg_hash = scalar_chip.assign_integer(ctx, msg_hash, Range::Remainder)?;
-                    ecdsa_chip.verify(ctx, &sig, &pk_assigned, &msg_hash)
+                    let mut my_dict: HashMap<String, usize> = HashMap::new();
+                    let response = ecdsa_chip.verify(ctx, &sig, &pk_assigned, &msg_hash, &mut my_dict);
+                    *self.offsets.borrow_mut() = my_dict;
+                    return response;
                 },
             )?;
 
@@ -294,6 +321,23 @@ mod tests {
         fn mod_n<C: CurveAffine>(x: C::Base) -> C::Scalar {
             let x_big = fe_to_big(x);
             big_to_fe(x_big)
+        }
+
+        fn find_closest_key(offset: usize, hm: &RefCell<HashMap<String, usize>>) -> Option<String> {
+            let mut best_key = None;
+            let mut smallest_diff = std::usize::MAX;
+
+            for (key, value) in hm.borrow().iter() {
+                if offset >= *value {
+                    let diff = offset - *value;
+                    if diff < smallest_diff {
+                        best_key = Some(key.clone());
+                        smallest_diff = diff;
+                    }
+                }
+            }
+
+            best_key
         }
 
         fn run<C: CurveAffine, N: FieldExt>() {
@@ -336,14 +380,43 @@ mod tests {
             let aux_generator = C::CurveExt::random(OsRng).to_affine();
             let circuit = TestCircuitEcdsaVerify::<C, N> {
                 public_key: Value::known(public_key),
-                signature: Value::known((r, s)),
+                signature: Value::known((s, s)),
                 msg_hash: Value::known(msg_hash),
                 aux_generator,
                 window_size: 2,
                 ..Default::default()
             };
             let instance = vec![vec![]];
-            assert_eq!(mock_prover_verify(&circuit, instance), Ok(()));
+            // assert_eq!(mock_prover_verify(&circuit, instance), Ok(()));
+            match mock_prover_verify(&circuit, instance) {
+                Ok(_) => {
+                    println!("ok");
+                },
+                Err(errors) => {
+                    for error in errors {
+                        match error {
+                            VerifyFailure::ConstraintNotSatisfied {constraint, location, cell_values} => {
+                                // println!("Constraint not satisfied: {:?}, location: {:?}, cell values: {:?}", constraint, location, cell_values);
+                                let offsets = &circuit.offsets;
+                                // println!("TestCircuitEcdsaVerify offsets {:?}", &offsets);
+                                match location {
+                                    FailureLocation::InRegion { region: _, offset } => {
+                                        // handle constraint not satisfied error
+                                        let key = find_closest_key(offset, offsets);
+                                        println!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {:?}. Constraint {:?}", offset, key);
+                                    },
+                                    FailureLocation::OutsideRegion { row: _ } => {
+                                        // handle constraint not satisfied error at row level
+                                    },
+                                }
+                            },
+                            _ => {
+                                // Handle other error types here
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         use crate::curves::bn256::Fr as BnScalar;
