@@ -215,6 +215,14 @@ pub trait IntegerInstructions<
         b: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<(), Error>;
 
+    /// Constraints that limbs of two [`AssignedInteger`] are equal.
+    fn is_strict_equal(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+        b: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<AssignedCondition<N>, Error>;
+
     /// Constraints that two [`AssignedInteger`] are not equal.
     fn assert_not_equal(
         &self,
@@ -229,6 +237,29 @@ pub trait IntegerInstructions<
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<(), Error>;
+
+    /// Check constraints that an [`AssignedInteger`] is not equal to zero
+    fn is_not_zero(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<AssignedCondition<N>, Error>;
+
+    /// Constraints for AND
+    fn and(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedCondition<N>,
+        b: &AssignedCondition<N>,
+    ) -> Result<AssignedCondition<N>, Error>;
+
+    /// Constraints for NAND
+    fn is_nand(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedCondition<N>,
+        b: &AssignedCondition<N>,
+    ) -> Result<AssignedCondition<N>, Error>;
 
     /// Constraints that an [`AssignedInteger`] is equal to zero
     fn assert_zero(

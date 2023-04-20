@@ -865,8 +865,25 @@ pub trait MainGateInstructions<F: FieldExt, const WIDTH: usize>: Chip<F> {
         Ok(())
     }
 
+    /// Assigns a new bit witness `r` to `0` if both given witneeses are not `0`
+    /// otherwise `1`
+    fn is_nand(
+        &self,
+        ctx: &mut RegionCtx<'_, F>,
+        a: &AssignedCondition<F>,
+        b: &AssignedCondition<F>,
+    ) -> Result<AssignedCondition<F>, Error> {
+        Ok(self.apply(
+            ctx,
+            [Term::assigned_to_mul(a), Term::assigned_to_mul(b)],
+            F::zero(),
+            CombinationOptionCommon::OneLinerMul.into(),
+        )?
+        .swap_remove(2))
+    }
+
     /// Assigns a new witness `r` as:
-    /// `r = a * b`
+    /// `r = a + b`
     fn add(
         &self,
         ctx: &mut RegionCtx<'_, F>,

@@ -4,8 +4,8 @@ use super::{AssignedInteger, AssignedLimb, UnassignedInteger};
 use crate::instructions::{IntegerInstructions, Range};
 use crate::rns::{Common, Integer, Rns};
 use halo2::arithmetic::FieldExt;
-use halo2::plonk::Error;
-use maingate::{halo2, AssignedCondition, AssignedValue, MainGateInstructions, RegionCtx};
+use halo2::{circuit::Value, plonk::Error};
+use maingate::{halo2, AssignedCondition, AssignedValue, MainGateInstructions, RegionCtx, Term};
 use maingate::{MainGate, MainGateConfig};
 use maingate::{RangeChip, RangeConfig};
 
@@ -376,6 +376,21 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
         Ok(())
     }
 
+    fn is_strict_equal(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+        b: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<AssignedCondition<N>, Error> {
+        let main_gate = self.main_gate();
+        let mut one = main_gate.assign_value(ctx, Value::known(N::one()))?;
+        for idx in 0..NUMBER_OF_LIMBS {
+            let term_1 = main_gate.is_equal(ctx, a.limb(idx), b.limb(idx))?;
+            one = main_gate.mul(ctx, &term_1, &one)?;
+        }
+        Ok(one)
+    }
+
     fn assert_not_equal(
         &self,
         ctx: &mut RegionCtx<'_, N>,
@@ -396,6 +411,36 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
         let a = &self.reduce_if_max_operand_value_exceeds(ctx, a)?;
         self.assert_not_zero_generic(ctx, a)?;
         Ok(())
+    }
+
+    fn is_not_zero(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<AssignedCondition<N>, Error> {
+        let a = &self.reduce_if_limb_values_exceeds_reduced(ctx, a)?;
+        let a = &self.reduce_if_max_operand_value_exceeds(ctx, a)?;
+        self.is_not_zero_generic(ctx, a)
+    }
+
+    fn and(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedCondition<N>,
+        b: &AssignedCondition<N>,
+    ) -> Result<AssignedCondition<N>, Error> {
+        let main_gate = self.main_gate();
+        main_gate.and(ctx, a, b)
+    }
+
+    fn is_nand(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedCondition<N>,
+        b: &AssignedCondition<N>,
+    ) -> Result<AssignedCondition<N>, Error> {
+        let main_gate = self.main_gate();
+        main_gate.is_nand(ctx, a, b)
     }
 
     fn assert_zero(

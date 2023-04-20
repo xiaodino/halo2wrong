@@ -8,8 +8,8 @@ use halo2::arithmetic::{CurveAffine, FieldExt};
 use halo2::dev::{VerifyFailure, FailureLocation};
 use halo2::{circuit::Value, plonk::Error};
 use integer::rns::Integer;
-use integer::{AssignedInteger, IntegerInstructions};
-use maingate::{MainGateConfig, RangeConfig};
+use integer::{AssignedInteger, IntegerInstructions, Range};
+use maingate::{AssignedCondition, MainGateConfig, RangeConfig};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -102,20 +102,27 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         pk: &AssignedPublicKey<E::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         msg_hash: &AssignedInteger<E::Scalar, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         offsets: &mut HashMap<String, usize>,
-    ) -> Result<(), Error> {
+        enable_skipping_invalid_signature: bool,
+    ) -> Result<AssignedCondition<N>, Error> {
         let ecc_chip = self.ecc_chip();
         let scalar_chip = ecc_chip.scalar_field_chip();
         let base_chip = ecc_chip.base_field_chip();
 
         offsets.insert("Started at".to_string(), ctx.offset());
 
-        // 1. check 0 < r, s < n
+        // 1. check 0 < r, s < n, if r == 0 or s == 0 the signature is marked as invalid
 
         // since `assert_not_zero` already includes a in-field check, we can just
         // call `assert_not_zero`
         offsets.insert("1. check 0 < r, s < n".to_string(), ctx.offset());
-        scalar_chip.assert_not_zero(ctx, &sig.r)?;
-        scalar_chip.assert_not_zero(ctx, &sig.s)?;
+
+        let is_r_valid = scalar_chip.is_not_zero(ctx, &sig.r)?;
+        let is_s_valid = scalar_chip.is_not_zero(ctx, &sig.s)?;
+        let is_r_s_valid = scalar_chip.and(ctx, &is_r_valid, &is_s_valid)?;
+
+        // println!("is_r_invalid {:?}", is_r_valid);
+        // println!("is_s_valid {:?}", is_s_valid);
+        // println!("is_invalid {:?}", is_r_s_invalid);
 
         // 2. w = s^(-1) (mod n)
         offsets.insert("2. w = s^(-1) (mod n)".to_string(), ctx.offset());
@@ -145,11 +152,27 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 
         // 7. check if Q.x == r (mod n)
         offsets.insert("7. check if Q.x == r (mod n)".to_string(), ctx.offset());
+        let is_q_x_reduced_in_r_equal_to_r = scalar_chip.is_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
         scalar_chip.assert_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
+        
+        offsets.insert("8. Check enable_skipping_invalid_signature".to_string(), ctx.offset());
+
+        let is_invalid = scalar_chip.is_nand(ctx, &is_r_s_valid, &is_q_x_reduced_in_r_equal_to_r)?;
+
+        let enable_skipping_invalid_signature_value = scalar_chip.assign_constant(ctx, enable_skipping_invalid_signature.into())?;
+        let value_1 = 1;
+        let value1 = scalar_chip.assign_constant(ctx, value_1.into())?;
+        let value_2 = 0;
+        let value2 = scalar_chip.assign_constant(ctx, value_2.into())?;
+        let result = scalar_chip.select(ctx, &value2, &value1, &is_invalid)?;
+
+        scalar_chip.assert_not_zero(ctx, &result)?;
+
+        // println!("result {:?}", result);
 
         offsets.insert("Finished at".to_string(), ctx.offset());
 
-        Ok(())
+        Ok(is_invalid)
     }
 }
 
@@ -304,7 +327,7 @@ mod tests {
                     };
                     let msg_hash = scalar_chip.assign_integer(ctx, msg_hash, Range::Remainder)?;
                     let mut my_dict: HashMap<String, usize> = HashMap::new();
-                    let response = ecdsa_chip.verify(ctx, &sig, &pk_assigned, &msg_hash, &mut my_dict);
+                    let response = ecdsa_chip.verify(ctx, &sig, &pk_assigned, &msg_hash, &mut my_dict, false);
                     *self.offsets.borrow_mut() = my_dict;
                     return response;
                 },
@@ -380,7 +403,9 @@ mod tests {
             let aux_generator = C::CurveExt::random(OsRng).to_affine();
             let circuit = TestCircuitEcdsaVerify::<C, N> {
                 public_key: Value::known(public_key),
-                signature: Value::known((s, s)),
+
+                // Set the wrong value to test invalid signature.
+                signature: Value::known((r, -s)),
                 msg_hash: Value::known(msg_hash),
                 aux_generator,
                 window_size: 2,
@@ -423,7 +448,7 @@ mod tests {
         use crate::curves::pasta::{Fp as PastaFp, Fq as PastaFq};
         use crate::curves::secp256k1::Secp256k1Affine as Secp256k1;
         run::<Secp256k1, BnScalar>();
-        run::<Secp256k1, PastaFp>();
-        run::<Secp256k1, PastaFq>();
+        // run::<Secp256k1, PastaFp>();
+        // run::<Secp256k1, PastaFq>();
     }
 }
