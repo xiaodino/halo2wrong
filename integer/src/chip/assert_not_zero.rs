@@ -111,7 +111,6 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
 
         let sanity_check = self.rns.wrong_modulus.clone()
             <= self.rns.native_modulus.clone() * two_pow_limb_bits_minus_1;
-        
 
         // r = 0 <-> r % 2 ^ 64 = 0 /\ r % native_modulus = 0
         // r <> 0 <-> r % 2 ^ 64 <> 0 \/ r % native_modulus <> 0

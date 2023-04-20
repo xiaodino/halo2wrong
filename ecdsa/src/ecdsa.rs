@@ -120,10 +120,6 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let is_s_valid = scalar_chip.is_not_zero(ctx, &sig.s)?;
         let is_r_s_valid = scalar_chip.and(ctx, &is_r_valid, &is_s_valid)?;
 
-        // println!("is_r_invalid {:?}", is_r_valid);
-        // println!("is_s_valid {:?}", is_s_valid);
-        // println!("is_invalid {:?}", is_r_s_invalid);
-
         // 2. w = s^(-1) (mod n)
         offsets.insert("2. w = s^(-1) (mod n)".to_string(), ctx.offset());
         let (s_inv, _) = scalar_chip.invert(ctx, &sig.s)?;
@@ -153,26 +149,19 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         // 7. check if Q.x == r (mod n)
         offsets.insert("7. check if Q.x == r (mod n)".to_string(), ctx.offset());
         let is_q_x_reduced_in_r_equal_to_r = scalar_chip.is_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
-        scalar_chip.assert_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
         
         offsets.insert("8. Check enable_skipping_invalid_signature".to_string(), ctx.offset());
-
-        let is_invalid = scalar_chip.is_nand(ctx, &is_r_s_valid, &is_q_x_reduced_in_r_equal_to_r)?;
-
+        let is_valid = scalar_chip.and(ctx, &is_r_s_valid, &is_q_x_reduced_in_r_equal_to_r)?;
         let enable_skipping_invalid_signature_value = scalar_chip.assign_constant(ctx, enable_skipping_invalid_signature.into())?;
-        let value_1 = 1;
-        let value1 = scalar_chip.assign_constant(ctx, value_1.into())?;
-        let value_2 = 0;
+        let value_2 = 1;
         let value2 = scalar_chip.assign_constant(ctx, value_2.into())?;
-        let result = scalar_chip.select(ctx, &value2, &value1, &is_invalid)?;
+        let result = scalar_chip.select(ctx, &value2, &enable_skipping_invalid_signature_value, &is_valid)?;
 
         scalar_chip.assert_not_zero(ctx, &result)?;
 
-        // println!("result {:?}", result);
-
         offsets.insert("Finished at".to_string(), ctx.offset());
 
-        Ok(is_invalid)
+        Ok(is_valid)
     }
 }
 
@@ -405,7 +394,7 @@ mod tests {
                 public_key: Value::known(public_key),
 
                 // Set the wrong value to test invalid signature.
-                signature: Value::known((r, -s)),
+                signature: Value::known((-r, s)),
                 msg_hash: Value::known(msg_hash),
                 aux_generator,
                 window_size: 2,
@@ -428,7 +417,7 @@ mod tests {
                                     FailureLocation::InRegion { region: _, offset } => {
                                         // handle constraint not satisfied error
                                         let key = find_closest_key(offset, offsets);
-                                        println!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {:?}. Constraint {:?}", offset, key);
+                                        panic!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {:?}. Constraint {:?}", offset, key);
                                     },
                                     FailureLocation::OutsideRegion { row: _ } => {
                                         // handle constraint not satisfied error at row level
