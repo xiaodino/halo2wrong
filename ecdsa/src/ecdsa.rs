@@ -155,7 +155,7 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let enable_skipping_invalid_signature_value = scalar_chip.assign_constant(ctx, enable_skipping_invalid_signature.into())?;
         let value_2 = 1;
         let value2 = scalar_chip.assign_constant(ctx, value_2.into())?;
-        let result = scalar_chip.select(ctx, &value2, &enable_skipping_invalid_signature_value, &is_valid)?;
+        let result = scalar_chip.select(ctx, &value2, &enable_skipping_invalid_signature_value, &is_q_x_reduced_in_r_equal_to_r)?;
 
         scalar_chip.assert_not_zero(ctx, &result)?;
 
@@ -437,7 +437,7 @@ mod tests {
         use crate::curves::pasta::{Fp as PastaFp, Fq as PastaFq};
         use crate::curves::secp256k1::Secp256k1Affine as Secp256k1;
         run::<Secp256k1, BnScalar>();
-        // run::<Secp256k1, PastaFp>();
-        // run::<Secp256k1, PastaFq>();
+        run::<Secp256k1, PastaFp>();
+        run::<Secp256k1, PastaFq>();
     }
 }
