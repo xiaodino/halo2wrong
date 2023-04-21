@@ -1,6 +1,6 @@
 use super::IntegerChip;
 use crate::{AssignedInteger, FieldExt};
-use halo2::plonk::Error;
+use halo2::{circuit::Value, plonk::Error};
 use maingate::{halo2, AssignedCondition, CombinationOptionCommon, MainGateInstructions, RegionCtx, Term};
 use num_bigint::BigUint as big_uint;
 use std::convert::TryInto;
@@ -169,6 +169,5 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
         let cond_r_equal_wrong_modulus = main_gate.is_nand(ctx, &cond_wrong_0, &cond_wrong_1)?;
 
         main_gate.and(ctx, &cond_r_equal_0, &cond_r_equal_wrong_modulus)
-
     }
 }

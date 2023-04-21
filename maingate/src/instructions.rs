@@ -873,13 +873,8 @@ pub trait MainGateInstructions<F: FieldExt, const WIDTH: usize>: Chip<F> {
         a: &AssignedCondition<F>,
         b: &AssignedCondition<F>,
     ) -> Result<AssignedCondition<F>, Error> {
-        Ok(self.apply(
-            ctx,
-            [Term::assigned_to_mul(a), Term::assigned_to_mul(b)],
-            F::zero(),
-            CombinationOptionCommon::OneLinerMul.into(),
-        )?
-        .swap_remove(2))
+        let and_a_b = self.and(ctx, a, b)?;
+        self.not(ctx, &and_a_b)
     }
 
     /// Assigns a new witness `r` as:
