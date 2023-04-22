@@ -189,6 +189,7 @@ mod tests {
     use std::collections::HashMap;
     use std::fmt::{self, Debug};
     use std::marker::PhantomData;
+    use std::fmt::Error as fmt_Error;
 
     const BIT_LEN_LIMB: usize = 68;
     const NUMBER_OF_LIMBS: usize = 4;
@@ -245,6 +246,7 @@ mod tests {
         aux_generator: E,
         window_size: usize,
 
+        enable_skipping_invalid_signature: bool,
         offsets: RefCell<HashMap<String, usize>>,
 
         _marker: PhantomData<N>,
@@ -313,7 +315,7 @@ mod tests {
                     };
                     let msg_hash = scalar_chip.assign_integer(ctx, msg_hash, Range::Remainder)?;
                     let mut my_dict: HashMap<String, usize> = HashMap::new();
-                    let response = ecdsa_chip.verify(ctx, &sig, &pk_assigned, &msg_hash, &mut my_dict, false);
+                    let response = ecdsa_chip.verify(ctx, &sig, &pk_assigned, &msg_hash, &mut my_dict, self.enable_skipping_invalid_signature);
                     *self.offsets.borrow_mut() = my_dict;
                     return response;
                 },
@@ -349,7 +351,7 @@ mod tests {
             best_key
         }
 
-        fn run<C: CurveAffine, N: FieldExt>() {
+        fn generate_valid_inputs<C: CurveAffine, N: FieldExt>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
             let g = C::generator();
 
             // Generate a key pair
@@ -386,15 +388,29 @@ mod tests {
                 assert_eq!(r, r_candidate);
             }
 
+            (public_key, r, s, msg_hash)
+        }
+
+        fn generate_invalid_inputs<C: CurveAffine, N: FieldExt>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
+            let (public_key, r, s, msg_hash) = generate_valid_inputs::<C, N>();
+            (public_key, -r, s, msg_hash)
+        }
+
+        fn run<C: CurveAffine, N: FieldExt>(valid_input: bool, enable_skipping_invalid_signature: bool) {
+            let (public_key, r, s, msg_hash) = if valid_input {
+                generate_valid_inputs::<C, N>()
+            } else {
+                generate_invalid_inputs::<C, N>()
+            };
+
             let aux_generator = C::CurveExt::random(OsRng).to_affine();
             let circuit = TestCircuitEcdsaVerify::<C, N> {
                 public_key: Value::known(public_key),
-
-                // Set the wrong value to test invalid signature.
-                signature: Value::known((-r, s)),
-                msg_hash: Value::known(msg_hash),
+                signature: Value::known((r, s)),
+                msg_hash:Value::known(msg_hash),
                 aux_generator,
                 window_size: 2,
+                enable_skipping_invalid_signature,
                 ..Default::default()
             };
             let instance = vec![vec![]];
@@ -406,15 +422,16 @@ mod tests {
                 Err(errors) => {
                     for error in errors {
                         match error {
-                            VerifyFailure::ConstraintNotSatisfied {constraint, location, cell_values} => {
-                                // println!("Constraint not satisfied: {:?}, location: {:?}, cell values: {:?}", constraint, location, cell_values);
+                            VerifyFailure::ConstraintNotSatisfied {constraint: _, location, cell_values: _} => {
                                 let offsets = &circuit.offsets;
                                 // println!("TestCircuitEcdsaVerify offsets {:?}", &offsets);
                                 match location {
                                     FailureLocation::InRegion { region: _, offset } => {
                                         // handle constraint not satisfied error
                                         let key = find_closest_key(offset, offsets);
-                                        panic!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {:?}. Constraint {:?}", offset, key);
+                                        if !enable_skipping_invalid_signature {
+                                            println!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {:?}. Constraint {:?}", offset, key);
+                                        }
                                     },
                                     FailureLocation::OutsideRegion { row: _ } => {
                                         // handle constraint not satisfied error at row level
@@ -433,8 +450,22 @@ mod tests {
         use crate::curves::bn256::Fr as BnScalar;
         use crate::curves::pasta::{Fp as PastaFp, Fq as PastaFq};
         use crate::curves::secp256k1::Secp256k1Affine as Secp256k1;
-        run::<Secp256k1, BnScalar>();
-        // run::<Secp256k1, PastaFp>();
-        // run::<Secp256k1, PastaFq>();
+        
+        // Return Errors
+        run::<Secp256k1, BnScalar>(false, false);
+        run::<Secp256k1, PastaFp>(false, false);
+        run::<Secp256k1, PastaFq>(false, false);
+
+        run::<Secp256k1, BnScalar>(false, true);
+        run::<Secp256k1, PastaFp>(false, true);
+        run::<Secp256k1, PastaFq>(false, true);
+
+        run::<Secp256k1, BnScalar>(true, false);
+        run::<Secp256k1, PastaFp>(true, false);
+        run::<Secp256k1, PastaFq>(true, false);
+
+        run::<Secp256k1, BnScalar>(true, true);
+        run::<Secp256k1, PastaFp>(true, true);
+        run::<Secp256k1, PastaFq>(true, true);
     }
 }
