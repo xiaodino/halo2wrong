@@ -5,9 +5,11 @@ use crate::instructions::{IntegerInstructions, Range};
 use crate::rns::{Common, Integer, Rns};
 use halo2::arithmetic::FieldExt;
 use halo2::{circuit::Value, plonk::Error};
+use maingate::halo2::circuit::Chip;
 use maingate::{halo2, AssignedCondition, AssignedValue, MainGateInstructions, RegionCtx, Term};
 use maingate::{MainGate, MainGateConfig};
 use maingate::{RangeChip, RangeConfig};
+use num_bigint::BigUint as big_uint;
 
 mod add;
 mod assert_in_field;
@@ -420,7 +422,11 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
     ) -> Result<AssignedCondition<N>, Error> {
         let a = &self.reduce_if_limb_values_exceeds_reduced(ctx, a)?;
         let a = &self.reduce_if_max_operand_value_exceeds(ctx, a)?;
-        self.is_not_zero_generic(ctx, a)
+
+        let main_gate = self.main_gate();
+        let zero = self.assign_constant(ctx, W::zero())?;
+        let is_strict_equal_zero = self.is_strict_equal(ctx, &zero, &a)?;
+        main_gate.not(ctx, &is_strict_equal_zero)
     }
 
     fn and(
