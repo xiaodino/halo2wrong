@@ -5,14 +5,10 @@ use crate::maingate;
 use ecc::maingate::RegionCtx;
 use ecc::{AssignedPoint, EccConfig, GeneralEccChip};
 use halo2::arithmetic::{CurveAffine, FieldExt};
-use halo2::dev::{VerifyFailure, FailureLocation};
 use halo2::{circuit::Value, plonk::Error};
 use integer::rns::Integer;
-use integer::{AssignedInteger, IntegerInstructions, Range};
+use integer::{AssignedInteger, IntegerInstructions};
 use maingate::{AssignedCondition, MainGateConfig, RangeConfig};
-
-use std::cell::RefCell;
-use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct EcdsaConfig {
@@ -101,7 +97,6 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         sig: &AssignedEcdsaSig<E::Scalar, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         pk: &AssignedPublicKey<E::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         msg_hash: &AssignedInteger<E::Scalar, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
-        offsets: &mut HashMap<String, usize>,
         enable_skipping_invalid_signature: bool,
     ) -> Result<AssignedCondition<N>, Error> {
         let ecc_chip = self.ecc_chip();
@@ -112,25 +107,20 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 
         // since `assert_not_zero` already includes a in-field check, we can just
         // call `assert_not_zero`
-        offsets.insert("1. check 0 < r, s < n".to_string(), ctx.offset());
         let is_r_valid = scalar_chip.is_not_zero(ctx, &sig.r)?;
         let is_s_valid = scalar_chip.is_not_zero(ctx, &sig.s)?;
         let is_r_s_valid = scalar_chip.and(ctx, &is_r_valid, &is_s_valid)?;
 
         // 2. w = s^(-1) (mod n)
-        offsets.insert("2. w = s^(-1) (mod n)".to_string(), ctx.offset());
         let (s_inv, _) = scalar_chip.invert(ctx, &sig.s)?;
 
         // 3. u1 = m' * w (mod n)
-        offsets.insert("3. u1 = m' * w (mod n)".to_string(), ctx.offset());
         let u1 = scalar_chip.mul(ctx, msg_hash, &s_inv)?;
 
         // 4. u2 = r * w (mod n)
-        offsets.insert("4. u2 = r * w (mod n)".to_string(), ctx.offset());
         let u2 = scalar_chip.mul(ctx, &sig.r, &s_inv)?;
 
         // 5. compute Q = u1*G + u2*pk
-        offsets.insert("5. compute Q = u1*G + u2*pk".to_string(), ctx.offset());
         let e_gen = ecc_chip.assign_point(ctx, Value::known(E::generator()))?;
         let g1 = ecc_chip.mul(ctx, &e_gen, &u1, 2)?;
         let g2 = ecc_chip.mul(ctx, &pk.point, &u2, 2)?;
@@ -138,16 +128,13 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 
         // 6. reduce q_x in E::ScalarExt
         // assuming E::Base/E::ScalarExt have the same number of limbs
-        offsets.insert("6. reduce q_x in E::ScalarExt".to_string(), ctx.offset());
         let q_x = q.x();
         let q_x_reduced_in_q = base_chip.reduce(ctx, q_x)?;
         let q_x_reduced_in_r = scalar_chip.reduce_external(ctx, &q_x_reduced_in_q)?;
 
         // 7. check if Q.x == r (mod n)
-        offsets.insert("7. check if Q.x == r (mod n)".to_string(), ctx.offset());
         let is_q_x_reduced_in_r_equal_to_r = scalar_chip.is_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
         
-        offsets.insert("8. Check enable_skipping_invalid_signature".to_string(), ctx.offset());
         let is_valid = scalar_chip.and(ctx, &is_r_s_valid, &is_q_x_reduced_in_r_equal_to_r)?;
         let enable_skipping_invalid_signature_value = scalar_chip.assign_constant(ctx, enable_skipping_invalid_signature.into())?;
         let value_2 = 1;
@@ -155,8 +142,6 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let result = scalar_chip.select(ctx, &value2, &enable_skipping_invalid_signature_value, &is_valid)?;
 
         scalar_chip.assert_not_zero(ctx, &result)?;
-
-        offsets.insert("Finished at".to_string(), ctx.offset());
 
         Ok(is_valid)
     }
@@ -189,7 +174,6 @@ mod tests {
     use std::collections::HashMap;
     use std::fmt::{self, Debug};
     use std::marker::PhantomData;
-    use std::fmt::Error as fmt_Error;
 
     const BIT_LEN_LIMB: usize = 68;
     const NUMBER_OF_LIMBS: usize = 4;
@@ -247,7 +231,6 @@ mod tests {
         window_size: usize,
 
         enable_skipping_invalid_signature: bool,
-        offsets: RefCell<HashMap<String, usize>>,
 
         _marker: PhantomData<N>,
     }
@@ -314,9 +297,7 @@ mod tests {
                         point: pk_in_circuit,
                     };
                     let msg_hash = scalar_chip.assign_integer(ctx, msg_hash, Range::Remainder)?;
-                    let mut my_dict: HashMap<String, usize> = HashMap::new();
-                    let response = ecdsa_chip.verify(ctx, &sig, &pk_assigned, &msg_hash, &mut my_dict, self.enable_skipping_invalid_signature);
-                    *self.offsets.borrow_mut() = my_dict;
+                    let response = ecdsa_chip.verify(ctx, &sig, &pk_assigned, &msg_hash, self.enable_skipping_invalid_signature);
                     return response;
                 },
             )?;
@@ -332,23 +313,6 @@ mod tests {
         fn mod_n<C: CurveAffine>(x: C::Base) -> C::Scalar {
             let x_big = fe_to_big(x);
             big_to_fe(x_big)
-        }
-
-        fn find_closest_key(offset: usize, hm: &RefCell<HashMap<String, usize>>) -> Option<String> {
-            let mut best_key = None;
-            let mut smallest_diff = std::usize::MAX;
-
-            for (key, value) in hm.borrow().iter() {
-                if offset >= *value {
-                    let diff = offset - *value;
-                    if diff < smallest_diff {
-                        best_key = Some(key.clone());
-                        smallest_diff = diff;
-                    }
-                }
-            }
-
-            best_key
         }
 
         fn generate_valid_inputs<C: CurveAffine, N: FieldExt>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
@@ -423,15 +387,10 @@ mod tests {
                     for error in errors {
                         match error {
                             VerifyFailure::ConstraintNotSatisfied {constraint: _, location, cell_values: _} => {
-                                let offsets = &circuit.offsets;
-                                // println!("TestCircuitEcdsaVerify offsets {:?}", &offsets);
                                 match location {
                                     FailureLocation::InRegion { region: _, offset } => {
                                         // handle constraint not satisfied error
-                                        let key = find_closest_key(offset, offsets);
-                                        if !enable_skipping_invalid_signature {
-                                            println!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {:?}. Constraint {:?}", offset, key);
-                                        }
+                                        println!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {:?}", offset);
                                     },
                                     FailureLocation::OutsideRegion { row: _ } => {
                                         // handle constraint not satisfied error at row level
