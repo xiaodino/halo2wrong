@@ -170,8 +170,6 @@ mod tests {
     use maingate::{MainGate, MainGateConfig, RangeChip, RangeConfig, RangeInstructions};
     use rand_core::OsRng;
 
-    use std::cell::RefCell;
-    use std::collections::HashMap;
     use std::fmt::{self, Debug};
     use std::marker::PhantomData;
 
@@ -356,8 +354,9 @@ mod tests {
         }
 
         fn generate_invalid_inputs<C: CurveAffine, N: FieldExt>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
-            let (public_key, r, s, msg_hash) = generate_valid_inputs::<C, N>();
-            (public_key, -r, s, msg_hash)
+            let (public_key, _, s, msg_hash) = generate_valid_inputs::<C, N>();
+            // Set the value of r incorrectly
+            (public_key, s, s, msg_hash)
         }
 
         fn run<C: CurveAffine, N: FieldExt>(valid_input: bool, enable_skipping_invalid_signature: bool) {

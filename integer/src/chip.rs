@@ -385,10 +385,11 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
         b: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<AssignedCondition<N>, Error> {
         let main_gate = self.main_gate();
+        let zero = main_gate.assign_value(ctx, Value::known(N::zero()))?;
         let mut one = main_gate.assign_value(ctx, Value::known(N::one()))?;
         for idx in 0..NUMBER_OF_LIMBS {
             let term_1 = main_gate.is_equal(ctx, a.limb(idx), b.limb(idx))?;
-            one = main_gate.mul(ctx, &term_1, &one)?;
+            one = main_gate.select(ctx, &one, &zero, &term_1)?;
         }
         Ok(one)
     }

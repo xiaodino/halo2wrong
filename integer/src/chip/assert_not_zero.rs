@@ -89,5 +89,4 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
 
         Ok(())
     }
-
 }
