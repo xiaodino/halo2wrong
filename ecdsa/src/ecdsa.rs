@@ -161,7 +161,6 @@ mod tests {
     use ecc::{EccConfig, GeneralEccChip};
     use halo2::arithmetic::CurveAffine;
     use halo2::circuit::{Layouter, SimpleFloorPlanner, Value};
-    use halo2::dev::{VerifyFailure, FailureLocation};
     use halo2::halo2curves::{
         ff::{Field, FromUniformBytes, PrimeField},
         group::{Curve, Group},
@@ -381,36 +380,11 @@ mod tests {
                 ..Default::default()
             };
             let instance = vec![vec![]];
-            // let result = mock_prover_verify(&circuit, instance);
-            // if valid_input || enable_skipping_invalid_signature {
-            //     assert_eq!(result, Ok(()));
-            // } else {
-            //     assert!(result.is_err()); // Expects an error
-            // }
-            match mock_prover_verify(&circuit, instance) {
-                Ok(_) => {
-                    println!("ok");
-                },
-                Err(errors) => {
-                    for error in errors {
-                        match error {
-                            VerifyFailure::ConstraintNotSatisfied {constraint: _, location, cell_values: _} => {
-                                match location {
-                                    FailureLocation::InRegion { region: _, offset } => {
-                                        // handle constraint not satisfied error
-                                        println!("VerifyFailure::ConstraintNotSatisfied not satisfied at offset {:?}", offset);
-                                    },
-                                    FailureLocation::OutsideRegion { row: _ } => {
-                                        // handle constraint not satisfied error at row level
-                                    },
-                                }
-                            },
-                            _ => {
-                                // Handle other error types here
-                            }
-                        }
-                    }
-                }
+            let result = mock_prover_verify(&circuit, instance);
+            if valid_input || enable_skipping_invalid_signature {
+                assert_eq!(result, Ok(()));
+            } else {
+                assert!(result.is_err());
             }
         }
 

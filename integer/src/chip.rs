@@ -5,11 +5,9 @@ use crate::instructions::{IntegerInstructions, Range};
 use crate::rns::{Common, Integer, Rns};
 use halo2::halo2curves::ff::PrimeField;
 use halo2::{circuit::Value, plonk::Error};
-use maingate::halo2::circuit::Chip;
-use maingate::{halo2, AssignedCondition, AssignedValue, MainGateInstructions, RegionCtx, Term};
+use maingate::{halo2, AssignedCondition, AssignedValue, MainGateInstructions, RegionCtx};
 use maingate::{MainGate, MainGateConfig};
 use maingate::{RangeChip, RangeConfig};
-use num_bigint::BigUint as big_uint;
 
 mod add;
 mod assert_in_field;
@@ -386,7 +384,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
     ) -> Result<AssignedCondition<N>, Error> {
         let main_gate = self.main_gate();
         let zero = main_gate.assign_value(ctx, Value::known(N::ZERO))?;
-        let mut one = main_gate.assign_value(ctx, Value::known(N::ZERO))?;
+        let mut one = main_gate.assign_value(ctx, Value::known(N::ONE))?;
         for idx in 0..NUMBER_OF_LIMBS {
             let term_1 = main_gate.is_equal(ctx, a.limb(idx), b.limb(idx))?;
             one = main_gate.select(ctx, &one, &zero, &term_1)?;
