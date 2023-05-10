@@ -383,13 +383,12 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         b: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<AssignedCondition<N>, Error> {
         let main_gate = self.main_gate();
-        let zero = main_gate.assign_value(ctx, Value::known(N::ZERO))?;
-        let mut one = main_gate.assign_value(ctx, Value::known(N::ONE))?;
+        let mut result = main_gate.assign_value(ctx, Value::known(N::ONE))?;
         for idx in 0..NUMBER_OF_LIMBS {
             let term_1 = main_gate.is_equal(ctx, a.limb(idx), b.limb(idx))?;
-            one = main_gate.select(ctx, &one, &zero, &term_1)?;
+            result = main_gate.and(ctx, &result, &term_1)?;
         }
-        Ok(one)
+        Ok(result)
     }
 
     fn assert_not_equal(
@@ -424,8 +423,28 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
 
         let main_gate = self.main_gate();
         let zero = self.assign_constant(ctx, W::ZERO)?;
-        let is_strict_equal_zero = self.is_strict_equal(ctx, &zero, &a)?;
-        main_gate.not(ctx, &is_strict_equal_zero)
+        let is_zero = self.is_strict_equal(ctx, &zero, &a)?;
+        main_gate.not(ctx, &is_zero)
+    }
+
+    fn one_or_one(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedCondition<N>,
+        b: &AssignedCondition<N>,
+    ) -> Result<(), Error> {
+        let main_gate = self.main_gate();
+        main_gate.one_or_one(ctx, a, b)
+    }
+
+    fn or(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedCondition<N>,
+        b: &AssignedCondition<N>,
+    ) -> Result<AssignedCondition<N>, Error> {
+        let main_gate = self.main_gate();
+        main_gate.or(ctx, a, b)
     }
 
     fn and(

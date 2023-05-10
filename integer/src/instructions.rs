@@ -245,6 +245,23 @@ pub trait IntegerInstructions<
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<AssignedCondition<N>, Error>;
 
+    /// Enforces one of given two values is `1`
+    /// `(a-1) * (b-1)  = 0`
+    fn one_or_one(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedCondition<N>,
+        b: &AssignedCondition<N>,
+    ) -> Result<(), Error>;
+
+    /// Constraints for OR
+    fn or(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedCondition<N>,
+        b: &AssignedCondition<N>,
+    ) -> Result<AssignedCondition<N>, Error>;
+
     /// Constraints for AND
     fn and(
         &self,

@@ -136,13 +136,9 @@ impl<E: CurveAffine, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_
         let is_q_x_reduced_in_r_equal_to_r = scalar_chip.is_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
         
         let is_valid = scalar_chip.and(ctx, &is_r_s_valid, &is_q_x_reduced_in_r_equal_to_r)?;
-        let value_1 = enable_skipping_invalid_signature as u64;
-        let enable_skipping_invalid_signature_value = scalar_chip.assign_constant(ctx, value_1.into())?;
-        let value_2 = 1;
-        let value2 = scalar_chip.assign_constant(ctx, value_2.into())?;
-        let result = scalar_chip.select(ctx, &value2, &enable_skipping_invalid_signature_value, &is_valid)?;
-
-        scalar_chip.assert_not_zero(ctx, &result)?;
+        let enable_skipping_invalid_signature = scalar_chip.assign_constant(ctx, (enable_skipping_invalid_signature as u64).into())?;
+        let enable_skipping_invalid_signature = scalar_chip.is_not_zero(ctx, &enable_skipping_invalid_signature)?;
+        scalar_chip.one_or_one(ctx, &enable_skipping_invalid_signature, &is_valid)?;
 
         Ok(is_valid)
     }
