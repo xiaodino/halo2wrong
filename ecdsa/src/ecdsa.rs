@@ -4,7 +4,8 @@ use crate::integer;
 use crate::maingate;
 use ecc::maingate::RegionCtx;
 use ecc::{AssignedPoint, EccConfig, GeneralEccChip};
-use halo2::arithmetic::{CurveAffine, FieldExt};
+use halo2::arithmetic::CurveAffine;
+use halo2::halo2curves::ff::PrimeField;
 use halo2::{circuit::Value, plonk::Error};
 use integer::rns::Integer;
 use integer::{AssignedInteger, IntegerInstructions};
@@ -35,8 +36,8 @@ impl EcdsaConfig {
 
 #[derive(Clone, Debug)]
 pub struct EcdsaSig<
-    W: FieldExt,
-    N: FieldExt,
+    W: PrimeField,
+    N: PrimeField,
     const NUMBER_OF_LIMBS: usize,
     const BIT_LEN_LIMB: usize,
 > {
@@ -45,8 +46,8 @@ pub struct EcdsaSig<
 }
 
 pub struct AssignedEcdsaSig<
-    W: FieldExt,
-    N: FieldExt,
+    W: PrimeField,
+    N: PrimeField,
     const NUMBER_OF_LIMBS: usize,
     const BIT_LEN_LIMB: usize,
 > {
@@ -55,8 +56,8 @@ pub struct AssignedEcdsaSig<
 }
 
 pub struct AssignedPublicKey<
-    W: FieldExt,
-    N: FieldExt,
+    W: PrimeField,
+    N: PrimeField,
     const NUMBER_OF_LIMBS: usize,
     const BIT_LEN_LIMB: usize,
 > {
@@ -65,12 +66,12 @@ pub struct AssignedPublicKey<
 
 pub struct EcdsaChip<
     E: CurveAffine,
-    N: FieldExt,
+    N: PrimeField,
     const NUMBER_OF_LIMBS: usize,
     const BIT_LEN_LIMB: usize,
 >(GeneralEccChip<E, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>);
 
-impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
+impl<E: CurveAffine, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
     EcdsaChip<E, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>
 {
     pub fn new(ecc_chip: GeneralEccChip<E, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>) -> Self {
@@ -88,7 +89,7 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
     }
 }
 
-impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
+impl<E: CurveAffine, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
     EcdsaChip<E, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>
 {
     pub fn verify(
@@ -122,9 +123,8 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 
         // 5. compute Q = u1*G + u2*pk
         let e_gen = ecc_chip.assign_point(ctx, Value::known(E::generator()))?;
-        let g1 = ecc_chip.mul(ctx, &e_gen, &u1, 2)?;
-        let g2 = ecc_chip.mul(ctx, &pk.point, &u2, 2)?;
-        let q = ecc_chip.add(ctx, &g1, &g2)?;
+        let pairs = vec![(e_gen, u1), (pk.point.clone(), u2)];
+        let q = ecc_chip.mul_batch_1d_horizontal(ctx, pairs, 4)?;
 
         // 6. reduce q_x in E::ScalarExt
         // assuming E::Base/E::ScalarExt have the same number of limbs
@@ -136,7 +136,8 @@ impl<E: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let is_q_x_reduced_in_r_equal_to_r = scalar_chip.is_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
         
         let is_valid = scalar_chip.and(ctx, &is_r_s_valid, &is_q_x_reduced_in_r_equal_to_r)?;
-        let enable_skipping_invalid_signature_value = scalar_chip.assign_constant(ctx, enable_skipping_invalid_signature.into())?;
+        let value_1 = enable_skipping_invalid_signature as u64;
+        let enable_skipping_invalid_signature_value = scalar_chip.assign_constant(ctx, value_1.into())?;
         let value_2 = 1;
         let value2 = scalar_chip.assign_constant(ctx, value_2.into())?;
         let result = scalar_chip.select(ctx, &value2, &enable_skipping_invalid_signature_value, &is_valid)?;
@@ -158,19 +159,20 @@ mod tests {
     use ecc::maingate::fe_to_big;
     use ecc::maingate::RegionCtx;
     use ecc::{EccConfig, GeneralEccChip};
-    use group::ff::Field;
-    use group::{Curve, Group};
     use halo2::arithmetic::CurveAffine;
-    use halo2::arithmetic::FieldExt;
     use halo2::circuit::{Layouter, SimpleFloorPlanner, Value};
     use halo2::dev::{VerifyFailure, FailureLocation};
+    use halo2::halo2curves::{
+        ff::{Field, FromUniformBytes, PrimeField},
+        group::{Curve, Group},
+    };
     use halo2::plonk::{Circuit, ConstraintSystem, Error};
     use integer::IntegerInstructions;
     use maingate::mock_prover_verify;
     use maingate::{MainGate, MainGateConfig, RangeChip, RangeConfig, RangeInstructions};
     use rand_core::OsRng;
 
-    use std::fmt::{self, Debug};
+    use std::fmt::{Debug};
     use std::marker::PhantomData;
 
     const BIT_LEN_LIMB: usize = 68;
@@ -183,7 +185,7 @@ mod tests {
     }
 
     impl TestCircuitEcdsaVerifyConfig {
-        pub fn new<C: CurveAffine, N: FieldExt>(meta: &mut ConstraintSystem<N>) -> Self {
+        pub fn new<C: CurveAffine, N: PrimeField>(meta: &mut ConstraintSystem<N>) -> Self {
             let (rns_base, rns_scalar) =
                 GeneralEccChip::<C, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>::rns();
             let main_gate_config = MainGate::<N>::configure(meta);
@@ -208,7 +210,7 @@ mod tests {
             EccConfig::new(self.range_config.clone(), self.main_gate_config.clone())
         }
 
-        pub fn config_range<N: FieldExt>(
+        pub fn config_range<N: PrimeField>(
             &self,
             layouter: &mut impl Layouter<N>,
         ) -> Result<(), Error> {
@@ -220,7 +222,7 @@ mod tests {
     }
 
     #[derive(Default, Clone)]
-    struct TestCircuitEcdsaVerify<E: CurveAffine, N: FieldExt> {
+    struct TestCircuitEcdsaVerify<E: CurveAffine, N: PrimeField> {
         public_key: Value<E>,
         signature: Value<(E::Scalar, E::Scalar)>,
         msg_hash: Value<E::Scalar>,
@@ -233,9 +235,11 @@ mod tests {
         _marker: PhantomData<N>,
     }
 
-    impl<E: CurveAffine, N: FieldExt> Circuit<N> for TestCircuitEcdsaVerify<E, N> {
+    impl<E: CurveAffine, N: PrimeField> Circuit<N> for TestCircuitEcdsaVerify<E, N> {
         type Config = TestCircuitEcdsaVerifyConfig;
         type FloorPlanner = SimpleFloorPlanner;
+        #[cfg(feature = "circuit-params")]
+        type Params = ();
 
         fn without_witnesses(&self) -> Self {
             Self::default()
@@ -261,7 +265,7 @@ mod tests {
                     let ctx = &mut RegionCtx::new(region, offset);
 
                     ecc_chip.assign_aux_generator(ctx, Value::known(self.aux_generator))?;
-                    ecc_chip.assign_aux(ctx, self.window_size, 1)?;
+                    ecc_chip.assign_aux(ctx, self.window_size, 2)?;
                     Ok(())
                 },
             )?;
@@ -313,7 +317,7 @@ mod tests {
             big_to_fe(x_big)
         }
 
-        fn generate_valid_inputs<C: CurveAffine, N: FieldExt>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
+        fn generate_valid_inputs<C: CurveAffine, N: FromUniformBytes<64> + Ord>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
             let g = C::generator();
 
             // Generate a key pair
@@ -353,13 +357,13 @@ mod tests {
             (public_key, r, s, msg_hash)
         }
 
-        fn generate_invalid_inputs<C: CurveAffine, N: FieldExt>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
+        fn generate_invalid_inputs<C: CurveAffine, N: FromUniformBytes<64> + Ord>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
             let (public_key, _, s, msg_hash) = generate_valid_inputs::<C, N>();
             // Set the value of r incorrectly
             (public_key, s, s, msg_hash)
         }
 
-        fn run<C: CurveAffine, N: FieldExt>(valid_input: bool, enable_skipping_invalid_signature: bool) {
+        fn run<C: CurveAffine, N: FromUniformBytes<64> + Ord>(valid_input: bool, enable_skipping_invalid_signature: bool) {
             let (public_key, r, s, msg_hash) = if valid_input {
                 generate_valid_inputs::<C, N>()
             } else {
@@ -372,12 +376,17 @@ mod tests {
                 signature: Value::known((r, s)),
                 msg_hash:Value::known(msg_hash),
                 aux_generator,
-                window_size: 2,
+                window_size: 4,
                 enable_skipping_invalid_signature,
                 ..Default::default()
             };
             let instance = vec![vec![]];
-            // assert_eq!(mock_prover_verify(&circuit, instance), Ok(()));
+            // let result = mock_prover_verify(&circuit, instance);
+            // if valid_input || enable_skipping_invalid_signature {
+            //     assert_eq!(result, Ok(()));
+            // } else {
+            //     assert!(result.is_err()); // Expects an error
+            // }
             match mock_prover_verify(&circuit, instance) {
                 Ok(_) => {
                     println!("ok");
