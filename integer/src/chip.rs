@@ -437,16 +437,6 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         main_gate.one_or_one(ctx, a, b)
     }
 
-    fn or(
-        &self,
-        ctx: &mut RegionCtx<'_, N>,
-        a: &AssignedCondition<N>,
-        b: &AssignedCondition<N>,
-    ) -> Result<AssignedCondition<N>, Error> {
-        let main_gate = self.main_gate();
-        main_gate.or(ctx, a, b)
-    }
-
     fn and(
         &self,
         ctx: &mut RegionCtx<'_, N>,
@@ -455,16 +445,6 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
     ) -> Result<AssignedCondition<N>, Error> {
         let main_gate = self.main_gate();
         main_gate.and(ctx, a, b)
-    }
-
-    fn is_nand(
-        &self,
-        ctx: &mut RegionCtx<'_, N>,
-        a: &AssignedCondition<N>,
-        b: &AssignedCondition<N>,
-    ) -> Result<AssignedCondition<N>, Error> {
-        let main_gate = self.main_gate();
-        main_gate.is_nand(ctx, a, b)
     }
 
     fn assert_zero(

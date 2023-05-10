@@ -866,18 +866,6 @@ pub trait MainGateInstructions<F: PrimeField, const WIDTH: usize>: Chip<F> {
         Ok(())
     }
 
-    /// Assigns a new bit witness `r` to `0` if both given witneeses are not `0`
-    /// otherwise `1`
-    fn is_nand(
-        &self,
-        ctx: &mut RegionCtx<'_, F>,
-        a: &AssignedCondition<F>,
-        b: &AssignedCondition<F>,
-    ) -> Result<AssignedCondition<F>, Error> {
-        let and_a_b = self.and(ctx, a, b)?;
-        self.not(ctx, &and_a_b)
-    }
-
     /// Assigns a new witness `r` as:
     /// `r = a + b`
     fn add(

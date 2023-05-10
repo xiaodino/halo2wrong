@@ -254,24 +254,8 @@ pub trait IntegerInstructions<
         b: &AssignedCondition<N>,
     ) -> Result<(), Error>;
 
-    /// Constraints for OR
-    fn or(
-        &self,
-        ctx: &mut RegionCtx<'_, N>,
-        a: &AssignedCondition<N>,
-        b: &AssignedCondition<N>,
-    ) -> Result<AssignedCondition<N>, Error>;
-
     /// Constraints for AND
     fn and(
-        &self,
-        ctx: &mut RegionCtx<'_, N>,
-        a: &AssignedCondition<N>,
-        b: &AssignedCondition<N>,
-    ) -> Result<AssignedCondition<N>, Error>;
-
-    /// Constraints for NAND
-    fn is_nand(
         &self,
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedCondition<N>,
