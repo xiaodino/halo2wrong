@@ -7,7 +7,7 @@ use halo2::arithmetic::CurveAffine;
 use halo2::circuit::{Layouter, Value};
 use halo2::halo2curves::ff::PrimeField;
 use halo2::plonk::Error;
-use integer::maingate::{RegionCtx, MainGateInstructions};
+use integer::maingate::RegionCtx;
 use maingate::{AssignedCondition, MainGate};
 use std::collections::BTreeMap;
 use std::rc::Rc;
