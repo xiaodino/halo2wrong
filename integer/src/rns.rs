@@ -328,7 +328,6 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         let max_operand = &((one << max_operand_bit_len) - one);
 
         // Sanity check
-        /*
         {
             let lhs = &(max_operand * max_operand);
             let rhs = &(max_quotient * wrong_modulus + max_remainder);
@@ -347,8 +346,6 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             assert!(rhs < crt_modulus);
             assert!(lhs < rhs);
         }
-        */
-
 
         // negative wrong field modulus moduli binary modulus `w'`
         // `w' = (T - w)`

@@ -995,9 +995,7 @@ pub trait MainGateInstructions<F: PrimeField, const WIDTH: usize>: Chip<F> {
             .zip(bases.into_iter())
             .map(|(bit, base)| Term::Assigned(bit, base))
             .collect::<Vec<_>>();
-
         let result = self.compose(ctx, &terms, F::ZERO)?;
-
         self.assert_equal(ctx, &result, composed)?;
         Ok(bits)
     }
@@ -1095,11 +1093,6 @@ pub trait MainGateInstructions<F: PrimeField, const WIDTH: usize>: Chip<F> {
         terms: &[Term<F>],
         constant: F,
     ) -> Result<AssignedValue<F>, Error> {
-
-        if terms.is_empty() {
-            return Err(Error::BoundsFailure);
-        }
-
         assert!(!terms.is_empty(), "At least one term is expected");
         let (composed, _) = self.decompose(ctx, terms, constant, |_, _| Ok(()))?;
 
