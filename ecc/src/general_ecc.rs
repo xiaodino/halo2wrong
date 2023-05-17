@@ -7,7 +7,7 @@ use halo2::arithmetic::CurveAffine;
 use halo2::circuit::{Layouter, Value};
 use halo2::halo2curves::ff::PrimeField;
 use halo2::plonk::Error;
-use integer::maingate::RegionCtx;
+use integer::maingate::{RegionCtx, MainGateInstructions};
 use maingate::{AssignedCondition, MainGate};
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -171,7 +171,6 @@ impl<
         point: AssignedPoint<Emulated::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         offset: usize,
     ) -> Result<(), Error> {
-        use integer::maingate::MainGateInstructions;
         let main_gate = self.main_gate();
 
         let mut offset = offset;
