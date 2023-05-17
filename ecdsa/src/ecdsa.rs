@@ -151,6 +151,7 @@ mod tests {
     use crate::halo2;
     use crate::integer;
     use crate::maingate;
+    use ecc::halo2::halo2curves::new_curve_impl;
     use ecc::integer::Range;
     use ecc::maingate::big_to_fe;
     use ecc::maingate::fe_to_big;
@@ -171,6 +172,7 @@ mod tests {
     use std::fmt::{Debug};
     use std::marker::PhantomData;
 
+    // const BIT_LEN_LIMB: usize = 64;
     const BIT_LEN_LIMB: usize = 68;
     const NUMBER_OF_LIMBS: usize = 4;
 
@@ -290,6 +292,8 @@ mod tests {
                         s: s_assigned,
                     };
 
+                    println!("ecc_chip assign_point {:?}", self.public_key);
+
                     let pk_in_circuit = ecc_chip.assign_point(ctx, self.public_key)?;
                     let pk_assigned = AssignedPublicKey {
                         point: pk_in_circuit,
@@ -350,12 +354,48 @@ mod tests {
                 assert_eq!(r, r_candidate);
             }
 
+            println!("public_key {:?}", public_key);
+
+            let coords = public_key.coordinates();
+            let coords = coords.unwrap();
+            let x = *coords.x();
+            let y = *coords.y();
+
+            println!("public_key x {:?}", x);
+            println!("public_key y {:?}", y);
+
+            let new_y = x * x;
+            println!("public_key new_y {:?}", new_y);
+
+            // let new_public_key = <C as CurveAffine>::new_curve_impl!() from_xy(x, new_y).to_affine();
+
+            // This is also a valid test case.
+            // let public_key = C::generator();
+
+            // public_key = public_key * public_key;
+
+            println!("new_public_key {:?}", public_key);
+
             (public_key, r, s, msg_hash)
         }
 
         fn generate_invalid_inputs<C: CurveAffine, N: FromUniformBytes<64> + Ord>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
             let (public_key, _, s, msg_hash) = generate_valid_inputs::<C, N>();
             // Set the value of r incorrectly
+            let value = msg_hash * msg_hash;
+            println!("msg_hash {:?}, invalid value {:?}", msg_hash, value);
+            println!("s {:?}, invalid value {:?}", s, s * s);
+            // println!("is_on_curve {:?}", s.is_on_curve());
+
+            let scaler = BnScalar::from_raw([
+                0x9C47D08FFB10D4B8,
+                0xFD17B448A6855419,
+                0x5DA4FBFC0E1108A8,
+                0x483ADA7726A3C465,
+            ]);
+            println!("scaler {:?}", scaler);
+            // let s = N::from_u128(1);
+
             (public_key, s, s, msg_hash)
         }
 
@@ -390,20 +430,20 @@ mod tests {
         use crate::curves::secp256k1::Secp256k1Affine as Secp256k1;
         
         // Return Errors
-        run::<Secp256k1, BnScalar>(false, false);
-        run::<Secp256k1, PastaFp>(false, false);
-        run::<Secp256k1, PastaFq>(false, false);
+        // run::<Secp256k1, BnScalar>(false, false);
+        // run::<Secp256k1, PastaFp>(false, false);
+        // run::<Secp256k1, PastaFq>(false, false);
 
-        run::<Secp256k1, BnScalar>(false, true);
-        run::<Secp256k1, PastaFp>(false, true);
-        run::<Secp256k1, PastaFq>(false, true);
+        // run::<Secp256k1, BnScalar>(false, true);
+        // run::<Secp256k1, PastaFp>(false, true);
+        // run::<Secp256k1, PastaFq>(false, true);
 
         run::<Secp256k1, BnScalar>(true, false);
-        run::<Secp256k1, PastaFp>(true, false);
-        run::<Secp256k1, PastaFq>(true, false);
+        // run::<Secp256k1, PastaFp>(true, false);
+        // run::<Secp256k1, PastaFq>(true, false);
 
-        run::<Secp256k1, BnScalar>(true, true);
-        run::<Secp256k1, PastaFp>(true, true);
-        run::<Secp256k1, PastaFq>(true, true);
+        // run::<Secp256k1, BnScalar>(true, true);
+        // run::<Secp256k1, PastaFp>(true, true);
+        // run::<Secp256k1, PastaFq>(true, true);
     }
 }

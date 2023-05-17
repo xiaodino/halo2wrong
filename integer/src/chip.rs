@@ -123,7 +123,12 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             } else {
                 BIT_LEN_LIMB
             };
+            //  {:?}", idx, number_of_bits);
+
             let decomposed_limb = main_gate.to_bits(ctx, integer.limb(idx), number_of_bits)?;
+
+            
+
             decomposed.extend(decomposed_limb);
         }
 
