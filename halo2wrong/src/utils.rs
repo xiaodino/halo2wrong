@@ -2,7 +2,7 @@ use crate::{
     curves::ff::{FromUniformBytes, PrimeField},
     halo2::{
         circuit::Value,
-        dev::{FailureLocation, MockProver, VerifyFailure},
+        dev::{MockProver, VerifyFailure},
         plonk::{
             Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error,
             Fixed, FloorPlanner, Instance, Selector,
@@ -68,22 +68,7 @@ pub fn mock_prover_verify<F: FromUniformBytes<64> + Ord, C: Circuit<F>>(
     circuit: &C,
     instance: Vec<Vec<F>>,
 ) -> Result<(), Vec<VerifyFailure>> {
-
-    let dimension = match DimensionMeasurement::measure(circuit) {
-        Ok(result) => result,
-        Err(err) => {
-            // Handle the error case here
-            return Err(vec![VerifyFailure::Lookup {
-                name: "lookup".to_string(),
-                lookup_index: 0,
-                location: FailureLocation::InRegion {
-                    region: (2, "Faulty synthesis").into(),
-                    offset: 1,
-                }
-            }]);
-        }
-    };
-
+    let dimension = DimensionMeasurement::measure(circuit).unwrap();
     let prover = MockProver::run(dimension.k(), circuit, instance)
         .unwrap_or_else(|err| panic!("{:#?}", err));
     prover.verify_at_rows_par(dimension.advice_range(), dimension.advice_range())

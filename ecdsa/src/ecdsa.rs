@@ -299,6 +299,7 @@ mod tests {
                     let (x, y) = if self.valid_input {
                         (x.clone(), y.clone())
                     } else {
+                        // Generate a point that is not on the curve.
                         (x.clone(), x.clone())
                     };
 
@@ -384,7 +385,7 @@ mod tests {
             let circuit = TestCircuitEcdsaVerify::<C, N> {
                 public_key: Value::known(public_key),
                 signature: Value::known((r, s)),
-                msg_hash:Value::known(msg_hash),
+                msg_hash: Value::known(msg_hash),
                 aux_generator,
                 window_size: 4,
                 valid_input,
