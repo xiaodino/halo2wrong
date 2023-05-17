@@ -302,7 +302,11 @@ mod tests {
                         (x.clone(), x.clone())
                     };
 
-                    let pk_in_circuit = ecc_chip.assign_x_y(ctx, x.into(), y.into())?;
+                    let (pk_in_circuit, is_pk_on_curve) = ecc_chip.assign_x_y(ctx, x.into(), y.into())?;
+                    let enable_skipping_invalid_signature = scalar_chip.assign_constant(ctx, (self.enable_skipping_invalid_signature as u64).into())?;
+                    let enable_skipping_invalid_signature = scalar_chip.is_not_zero(ctx, &enable_skipping_invalid_signature)?;
+                    scalar_chip.one_or_one(ctx, &enable_skipping_invalid_signature, &is_pk_on_curve)?;
+
                     let pk_assigned = AssignedPublicKey {
                         point: pk_in_circuit,
                     };

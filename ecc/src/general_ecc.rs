@@ -214,7 +214,8 @@ impl<
             .map(|point| (point.x().clone(), point.y().clone()))
             .unzip();
 
-        self.assign_x_y(ctx, x.into(), y.into())
+        let (point, _) = self.assign_x_y(ctx, x.into(), y.into())?;
+        Ok(point)
     }
 
     /// Takes `Point.x` and `Point.y` of the EC and returns it as `AssignedPoint`
@@ -223,17 +224,15 @@ impl<
         ctx: &mut RegionCtx<'_, N>,
         x: UnassignedInteger<<Emulated as CurveAffine>::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         y: UnassignedInteger<<Emulated as CurveAffine>::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
-    ) -> Result<AssignedPoint<Emulated::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error> {
+    ) -> Result<(AssignedPoint<Emulated::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
         let integer_chip = self.base_field_chip();
 
         let x = integer_chip.assign_integer(ctx, x.into(), Range::Remainder)?;
         let y = integer_chip.assign_integer(ctx, y.into(), Range::Remainder)?;
 
         let point = AssignedPoint::new(x, y);
-
-        self.assert_is_on_curve(ctx, &point)?;
-
-        Ok(point)
+        let is_on_curve = self.is_on_curve(ctx, &point)?;
+        Ok((point, is_on_curve))
     }
 
     /// Assigns the auxiliary generator point
@@ -282,6 +281,21 @@ impl<
         let x_cube_b = &integer_chip.add_constant(ctx, x_cube, &self.parameter_b())?;
         integer_chip.assert_equal(ctx, x_cube_b, y_square)?;
         Ok(())
+    }
+
+    /// Constraints to check if `AssignedPoint` is on curve
+    pub fn is_on_curve(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        point: &AssignedPoint<Emulated::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<AssignedCondition<N>, Error> {
+        let integer_chip = self.base_field_chip();
+
+        let y_square = &integer_chip.square(ctx, point.y())?;
+        let x_square = &integer_chip.square(ctx, point.x())?;
+        let x_cube = &integer_chip.mul(ctx, point.x(), x_square)?;
+        let x_cube_b = &integer_chip.add_constant(ctx, x_cube, &self.parameter_b())?;
+        integer_chip.is_strict_equal(ctx, x_cube_b, y_square)
     }
 
     /// Constraints assert two `AssignedPoint`s are equal
