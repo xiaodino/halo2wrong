@@ -7,7 +7,7 @@ use halo2::arithmetic::CurveAffine;
 use halo2::circuit::{Layouter, Value};
 use halo2::halo2curves::ff::PrimeField;
 use halo2::plonk::Error;
-use integer::maingate::RegionCtx;
+use integer::maingate::{RegionCtx, MainGateInstructions};
 use maingate::{AssignedCondition, MainGate};
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -209,12 +209,15 @@ impl<
         ctx: &mut RegionCtx<'_, N>,
         point: Value<Emulated>,
     ) -> Result<AssignedPoint<Emulated::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error> {
+        let maingate = self.main_gate();
+
         let point = point.map(|point| self.to_rns_point(point));
         let (x, y) = point
             .map(|point| (point.x().clone(), point.y().clone()))
             .unzip();
 
-        let (point, _) = self.assign_x_y(ctx, x.into(), y.into())?;
+        let (point, is_on_curve) = self.assign_x_y(ctx, x.into(), y.into())?;
+        maingate.assert_not_zero(ctx, &is_on_curve)?;
         Ok(point)
     }
 
