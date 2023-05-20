@@ -45,6 +45,25 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
     ///
     /// Panics if the value of the integer is greater than [`Rns`]
     /// `max_reducible_value`.
+    pub(super) fn try_reduce(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
+        let main_gate = self.main_gate();
+
+        let (a, is_reduce_if_limb_values_succeeded) = self.try_reduce_if_limb_values_exceeds_reduced(ctx, a)?;
+        let (a, is_reduce_if_max_operand_value_succeeded) = self.try_reduce_if_max_operand_value_exceeds(ctx, &a)?;
+        let is_reduce_succeeded = main_gate.and(ctx, &is_reduce_if_limb_values_succeeded, &is_reduce_if_max_operand_value_succeeded)?;
+
+        Ok((a, is_reduce_succeeded))
+    }
+
+    /// Try to reduces an [`AssignedInteger`] if any of its limbs values is greater
+    /// than the [`Rns`] `max_unreduced_limb`.
+    ///
+    /// Panics if the value of the integer is greater than [`Rns`]
+    /// `max_reducible_value`.
     pub(super) fn try_reduce_if_limb_values_exceeds_reduced(
         &self,
         ctx: &mut RegionCtx<'_, N>,

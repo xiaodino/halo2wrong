@@ -419,15 +419,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<AssignedCondition<N>, Error> {
         let main_gate = self.main_gate();
-
-        let (a, is_reduce_if_limb_values_succeeded) = &self.try_reduce_if_limb_values_exceeds_reduced(ctx, a)?;
-        let (a, is_reduce_if_max_operand_value_succeeded) = &self.try_reduce_if_max_operand_value_exceeds(ctx, a)?;
-        let is_reduce_succeeded = main_gate.and(ctx, &is_reduce_if_limb_values_succeeded, &is_reduce_if_max_operand_value_succeeded)?;
-
+        let (a, is_reduce_succeeded) = &self.try_reduce(ctx, a)?;
         let zero = self.assign_constant(ctx, W::ZERO)?;
         let is_zero = self.is_strict_equal(ctx, &zero, &a)?;
         let result = main_gate.not(ctx, &is_zero)?;
-        main_gate.and(ctx, &result, &is_reduce_succeeded)
+        main_gate.and(ctx, &result, is_reduce_succeeded)
     }
 
     fn one_or_one(
