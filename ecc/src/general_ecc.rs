@@ -229,12 +229,13 @@ impl<
     ) -> Result<(AssignedPoint<Emulated::Base, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
         let integer_chip = self.base_field_chip();
 
-        let x = integer_chip.assign_integer(ctx, x.into(), Range::Remainder)?;
-        let y = integer_chip.assign_integer(ctx, y.into(), Range::Remainder)?;
-
+        let (x, is_x_valid) = integer_chip.try_assign_integer(ctx, x.into(), Range::Remainder)?;
+        let (y, is_y_valid) = integer_chip.try_assign_integer(ctx, y.into(), Range::Remainder)?;
+        let is_valid = integer_chip.and(ctx, &is_x_valid, &is_y_valid)?;
         let point = AssignedPoint::new(x, y);
         let is_on_curve = self.is_on_curve(ctx, &point)?;
-        Ok((point, is_on_curve))
+        let is_valid = integer_chip.and(ctx, &is_valid, &is_on_curve)?;
+        Ok((point, is_valid))
     }
 
     /// Assigns the auxiliary generator point

@@ -35,6 +35,15 @@ pub trait IntegerInstructions<
         range: Range,
     ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error>;
 
+    /// Try to assigns an [`Integer`] to a cell in the circuit without range check for the
+    /// appropriate [`Range`].
+    fn try_assign_integer(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        integer: UnassignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+        range: Range,
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error>;
+
     /// Assigns an [`Integer`] constant to a cell in the circuit returning an
     /// [`AssignedInteger`].
     fn assign_constant(

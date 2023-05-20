@@ -99,6 +99,26 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         self.assign_integer_generic(ctx, integer, range)
     }
 
+    fn try_assign_integer(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        integer: UnassignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+        range: Range,
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
+        let zero = self.assign_constant(ctx, W::ZERO)?;
+        let one = self.assign_constant(ctx, W::ONE)?;
+        let zero = self.is_strict_equal(ctx, &zero, &one)?;
+        let one = self.is_strict_equal(ctx, &one.clone(), &one)?;
+        match self.assign_integer_generic(ctx, integer, range) {
+            Ok(result) => {
+                Ok((result, one))
+            }
+            Err(_) => {
+                Ok((self.assign_constant(ctx, W::ZERO)?, zero))
+            }
+        }
+    }
+
     fn assign_constant(
         &self,
         ctx: &mut RegionCtx<'_, N>,

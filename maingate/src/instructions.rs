@@ -1093,11 +1093,8 @@ pub trait MainGateInstructions<F: PrimeField, const WIDTH: usize>: Chip<F> {
         terms: &[Term<F>],
         constant: F,
     ) -> Result<AssignedValue<F>, Error> {
-
         assert!(!terms.is_empty(), "At least one term is expected");
-
         let (composed, _) = self.decompose(ctx, terms, constant, |_, _| Ok(()))?;
-
         Ok(composed)
     }
 
