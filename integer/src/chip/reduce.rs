@@ -2,7 +2,7 @@ use super::{IntegerChip, IntegerInstructions, Range};
 use crate::rns::MaybeReduced;
 use crate::{AssignedInteger, PrimeField};
 use halo2::plonk::Error;
-use maingate::{halo2, AssignedValue, MainGateInstructions, RangeInstructions, RegionCtx, Term};
+use maingate::{halo2, AssignedCondition, AssignedValue, MainGateInstructions, RangeInstructions, RegionCtx, Term};
 
 impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
     IntegerChip<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>
@@ -40,6 +40,38 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         }
     }
 
+    /// Try to reduces an [`AssignedInteger`] if any of its limbs values is greater
+    /// than the [`Rns`] `max_unreduced_limb`.
+    ///
+    /// Panics if the value of the integer is greater than [`Rns`]
+    /// `max_reducible_value`.
+    pub(super) fn try_reduce_if_limb_values_exceeds_reduced(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
+        let zero = self.assign_constant(ctx, W::ZERO)?;
+        let one = self.assign_constant(ctx, W::ONE)?;
+        let zero = self.is_strict_equal(ctx, &zero, &one)?;
+        let one = self.is_strict_equal(ctx, &one.clone(), &one)?;
+        let exceeds_max_limb_value = a
+            .limbs
+            .iter()
+            .any(|limb| limb.max_val() > self.rns.max_reduced_limb);
+        if exceeds_max_limb_value {
+            match self.reduce(ctx, a) {
+                Ok(result) => {
+                    Ok((result, one))
+                }
+                Err(_) => {
+                    Ok((a.clone(), zero))
+                }
+            }
+        } else {
+            Ok((self.new_assigned_integer(a.limbs(), a.native().clone()), one))
+        }
+    }
+
     /// Reduces an [`AssignedInteger`] if any of its limbs values is greater
     /// than the [`Rns`] `max_reduced_limb`
     pub(super) fn reduce_if_limb_values_exceeds_reduced(
@@ -70,6 +102,32 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             self.reduce(ctx, a)
         } else {
             Ok(self.new_assigned_integer(a.limbs(), a.native().clone()))
+        }
+    }
+
+    /// Try to reduces an [`AssignedInteger`] if any of its max value is greater
+    /// than the [`Rns`] `max_operand`.
+    pub(super) fn try_reduce_if_max_operand_value_exceeds(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
+        let zero = self.assign_constant(ctx, W::ZERO)?;
+        let one = self.assign_constant(ctx, W::ONE)?;
+        let zero = self.is_strict_equal(ctx, &zero, &one)?;
+        let one = self.is_strict_equal(ctx, &one.clone(), &one)?;
+        let exceeds_max_value = a.max_val() > self.rns.max_operand;
+        if exceeds_max_value {
+            match self.reduce(ctx, a) {
+                Ok(result) => {
+                    Ok((result, one))
+                }
+                Err(_) => {
+                    Ok((a.clone(), zero))
+                }
+            }
+        } else {
+            Ok((self.new_assigned_integer(a.limbs(), a.native().clone()), one))
         }
     }
 

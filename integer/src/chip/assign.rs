@@ -85,6 +85,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             .zip(self.rns.left_shifters.iter())
             .map(|(limb, sh)| Term::Assigned(limb.as_ref(), *sh))
             .collect();
+
+
         let native = main_gate.compose(ctx, &limbs_to_compose, N::ZERO)?;
 
         Ok(self.new_assigned_integer(&limbs.try_into().unwrap(), native))
