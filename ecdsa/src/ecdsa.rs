@@ -129,14 +129,16 @@ impl<E: CurveAffine, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_
         // 6. reduce q_x in E::ScalarExt
         // assuming E::Base/E::ScalarExt have the same number of limbs
         let q_x = q.x();
-        let q_x_reduced_in_q = base_chip.reduce(ctx, q_x)?;
-        let q_x_reduced_in_r = scalar_chip.reduce_external(ctx, &q_x_reduced_in_q)?;
+        let (q_x_reduced_in_q, is_q_x_reduced_in_q_valid) = base_chip.reduce(ctx, q_x)?;
+        let (q_x_reduced_in_r, is_q_x_reduced_in_r_valid) = scalar_chip.reduce_external(ctx, &q_x_reduced_in_q)?;
+        let is_q_x_reduced_valid = scalar_chip.and(ctx, &is_q_x_reduced_in_q_valid, &is_q_x_reduced_in_r_valid)?;
 
         // 7. check if Q.x == r (mod n)
         let is_q_x_reduced_in_r_equal_to_r = scalar_chip.is_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
         
         // 8. check if both is_r_s_valid and is_q_x_reduced_in_r_equal_to_r are true to determine overall validity
         let is_valid = scalar_chip.and(ctx, &is_r_s_valid, &is_q_x_reduced_in_r_equal_to_r)?;
+        let is_valid = scalar_chip.and(ctx, &is_valid, &is_q_x_reduced_valid)?;
         let enable_skipping_invalid_signature = scalar_chip.assign_constant(ctx, (enable_skipping_invalid_signature as u64).into())?;
         let enable_skipping_invalid_signature = scalar_chip.is_not_zero(ctx, &enable_skipping_invalid_signature)?;
         scalar_chip.one_or_one(ctx, &enable_skipping_invalid_signature, &is_valid)?;

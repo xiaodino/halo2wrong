@@ -16,8 +16,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         ctx: &mut RegionCtx<'_, N>,
         integer: UnassignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         range: Range,
-    // ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
-    ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error> {
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
+    // ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error> {
         let range_chip = self.range_chip();
         let main_gate = self.main_gate();
 
@@ -87,11 +87,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             .map(|(limb, sh)| Term::Assigned(limb.as_ref(), *sh))
             .collect();
 
-        let limbs_to_compose_len = main_gate.assign_constant(ctx, (limbs_to_compose.is_empty() as u64).into())?;
+        let limbs_to_compose_len = main_gate.assign_constant(ctx, (!limbs_to_compose.is_empty() as u64).into())?;
         let native = main_gate.compose(ctx, &limbs_to_compose, N::ZERO)?;
 
-        // Ok((self.new_assigned_integer(&limbs.try_into().unwrap(), native), limbs_to_compose_len))
-        Ok(self.new_assigned_integer(&limbs.try_into().unwrap(), native))
+        Ok((self.new_assigned_integer(&limbs.try_into().unwrap(), native), limbs_to_compose_len))
+        // Ok(self.new_assigned_integer(&limbs.try_into().unwrap(), native))
     }
 
     pub(super) fn assign_constant_generic(

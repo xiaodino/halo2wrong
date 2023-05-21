@@ -206,7 +206,7 @@ pub trait IntegerInstructions<
         &self,
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
-    ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error>;
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error>;
 
     /// Constraints that two [`AssignedInteger`] are equal.
     fn assert_equal(
@@ -334,7 +334,7 @@ pub trait IntegerInstructions<
         &self,
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedInteger<T, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
-    ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error>;
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error>;
 
     /// Applies % 2 to the given input
     fn sign(

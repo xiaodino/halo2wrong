@@ -34,7 +34,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             assert!(a.max_val() < max_reducible_value);
         }
         if exceeds_max_limb_value {
-            self.reduce(ctx, a)
+            let result = self.reduce(ctx, a)?;
+            Ok(result.0)
         } else {
             Ok(self.new_assigned_integer(a.limbs(), a.native().clone()))
         }
@@ -69,23 +70,14 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
-        let zero = self.assign_constant(ctx, W::ZERO)?;
         let one = self.assign_constant(ctx, W::ONE)?;
-        let zero = self.is_strict_equal(ctx, &zero, &one)?;
         let one = self.is_strict_equal(ctx, &one.clone(), &one)?;
         let exceeds_max_limb_value = a
             .limbs
             .iter()
             .any(|limb| limb.max_val() > self.rns.max_reduced_limb);
         if exceeds_max_limb_value {
-            match self.reduce(ctx, a) {
-                Ok(result) => {
-                    Ok((result, one))
-                }
-                Err(_) => {
-                    Ok((a.clone(), zero))
-                }
-            }
+            self.reduce(ctx, a)
         } else {
             Ok((self.new_assigned_integer(a.limbs(), a.native().clone()), one))
         }
@@ -103,7 +95,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             .iter()
             .any(|limb| limb.max_val() > self.rns.max_reduced_limb);
         if exceeds_max_limb_value {
-            self.reduce(ctx, a)
+            let result = self.reduce(ctx, a)?;
+            Ok(result.0)
         } else {
             Ok(self.new_assigned_integer(a.limbs(), a.native().clone()))
         }
@@ -118,7 +111,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
     ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error> {
         let exceeds_max_value = a.max_val() > self.rns.max_operand;
         if exceeds_max_value {
-            self.reduce(ctx, a)
+            let result = self.reduce(ctx, a)?;
+            Ok(result.0)
         } else {
             Ok(self.new_assigned_integer(a.limbs(), a.native().clone()))
         }
@@ -131,20 +125,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
-        let zero = self.assign_constant(ctx, W::ZERO)?;
         let one = self.assign_constant(ctx, W::ONE)?;
-        let zero = self.is_strict_equal(ctx, &zero, &one)?;
         let one = self.is_strict_equal(ctx, &one.clone(), &one)?;
         let exceeds_max_value = a.max_val() > self.rns.max_operand;
         if exceeds_max_value {
-            match self.reduce(ctx, a) {
-                Ok(result) => {
-                    Ok((result, one))
-                }
-                Err(_) => {
-                    Ok((a.clone(), zero))
-                }
-            }
+            self.reduce(ctx, a)
         } else {
             Ok((self.new_assigned_integer(a.limbs(), a.native().clone()), one))
         }
@@ -154,7 +139,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         &self,
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
-    ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error> {
+    ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
+    // ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error> {
         let main_gate = self.main_gate();
         let (zero, one) = (N::ZERO, N::ONE);
 
@@ -163,9 +149,12 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         let quotient = witness.short();
         let result = witness.result();
 
+        // Add soft check here
         // Apply ranges
         let range_chip = self.range_chip();
-        let result = self.assign_integer(ctx, result.into(), Range::Remainder)?;
+
+        // Change to try_assign_integer that has soft check
+        let result = self.try_assign_integer(ctx, result.into(), Range::Remainder)?;
         let quotient = range_chip.assign(ctx, quotient, Self::sublimb_bit_len(), BIT_LEN_LIMB)?;
         let residues = witness
             .residues()
@@ -195,7 +184,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             ctx,
             &t.try_into()
                 .expect("Unexpected failure in AssignedCell -> AssignedValue conversion"),
-            &result,
+            &result.0,
             residues,
         )?;
 
@@ -205,7 +194,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             &[
                 Term::Assigned(a.native(), -one),
                 Term::Assigned(&quotient, self.rns.wrong_modulus_in_native_modulus),
-                Term::Assigned(result.native(), one),
+                Term::Assigned(result.0.native(), one),
             ],
             zero,
         )?;
