@@ -310,26 +310,21 @@ mod tests {
                     let integer_s = ecc_chip.new_unassigned_scalar(s);
                     let msg_hash = ecc_chip.new_unassigned_scalar(self.msg_hash);
 
-                    let r_assigned =
+                    let (r_assigned, is_assigned_integer_succeeded ) =
                         scalar_chip.try_assign_integer(ctx, integer_r, Range::Remainder)?;
-                    let s_assigned =
+                    let is_valid = scalar_chip.and(ctx, &is_valid, &is_assigned_integer_succeeded)?;
+                    let (s_assigned, is_assigned_integer_succeeded) =
                         scalar_chip.try_assign_integer(ctx, integer_s, Range::Remainder)?;
+                    let is_valid = scalar_chip.and(ctx, &is_valid, &is_assigned_integer_succeeded)?;
                     let sig = AssignedEcdsaSig {
-                        r: r_assigned.0,
-                        s: s_assigned.0,
+                        r: r_assigned,
+                        s: s_assigned,
                     };
 
                     let point = self.public_key.map(|point| ecc_chip.to_rns_point(point));
                     let (x, y) = point
                         .map(|point| (point.x().clone(), point.y().clone()))
                         .unzip();
-                    let (x, y) = if self.valid_input {
-                        (x.clone(), y.clone())
-                    } else {
-                        // Generate a point that is not on the curve.
-                        (x.clone(), x.clone())
-                    };
-
                     let (pk_in_circuit, is_pk_on_curve) = ecc_chip.assign_x_y(ctx, x.into(), y.into())?;
                     let is_valid = scalar_chip.and(ctx, &is_valid, &is_pk_on_curve)?;
 
