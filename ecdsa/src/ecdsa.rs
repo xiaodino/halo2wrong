@@ -168,10 +168,13 @@ mod tests {
     use integer::IntegerInstructions;
     use maingate::mock_prover_verify;
     use maingate::{MainGate, MainGateConfig, RangeChip, RangeConfig, RangeInstructions};
+    use num_traits::Num;
     use rand_core::OsRng;
 
     use std::fmt::{Debug};
     use std::marker::PhantomData;
+
+    use num_bigint::BigUint as big_uint;
 
     // const BIT_LEN_LIMB: usize = 64;
     const BIT_LEN_LIMB: usize = 68;
@@ -231,6 +234,8 @@ mod tests {
 
         valid_input: bool,
         enable_skipping_invalid_signature: bool,
+        r: E::Scalar,
+        s: E::Scalar,
 
         _marker: PhantomData<N>,
     }
@@ -279,6 +284,26 @@ mod tests {
                     let offset = 0;
                     let ctx = &mut RegionCtx::new(region, offset);
 
+                    let mut is_valid = scalar_chip.assign_constant(ctx, (1 as u64).into())?;
+
+                    // r and s should be less than Remiander
+                    let r = if self.valid_input {
+                        let r = format!("{:?}", self.r);
+                        big_uint::from_str_radix(&r[2..], 16).unwrap()
+                    } else {
+                        scalar_chip.rns().max_remainder.clone() + big_uint::from(20u32)
+                    };
+                    let s = if self.valid_input {
+                        let s = format!("{:?}", self.s);
+                        big_uint::from_str_radix(&s[2..], 16).unwrap()
+                    } else {
+                        scalar_chip.rns().max_remainder.clone() + big_uint::from(20u32)
+                    };
+                    if r > scalar_chip.rns().max_remainder || s > scalar_chip.rns().max_remainder {
+                        is_valid = scalar_chip.assign_constant(ctx, (0 as u64).into())?;
+                    }
+                    let is_valid = scalar_chip.is_not_zero(ctx, &is_valid)?;
+
                     let r = self.signature.map(|signature| signature.0);
                     let s = self.signature.map(|signature| signature.1);
                     let integer_r = ecc_chip.new_unassigned_scalar(r);
@@ -286,12 +311,12 @@ mod tests {
                     let msg_hash = ecc_chip.new_unassigned_scalar(self.msg_hash);
 
                     let r_assigned =
-                        scalar_chip.assign_integer(ctx, integer_r, Range::Remainder)?;
+                        scalar_chip.try_assign_integer(ctx, integer_r, Range::Remainder)?;
                     let s_assigned =
-                        scalar_chip.assign_integer(ctx, integer_s, Range::Remainder)?;
+                        scalar_chip.try_assign_integer(ctx, integer_s, Range::Remainder)?;
                     let sig = AssignedEcdsaSig {
-                        r: r_assigned,
-                        s: s_assigned,
+                        r: r_assigned.0,
+                        s: s_assigned.0,
                     };
 
                     let point = self.public_key.map(|point| ecc_chip.to_rns_point(point));
@@ -306,9 +331,11 @@ mod tests {
                     };
 
                     let (pk_in_circuit, is_pk_on_curve) = ecc_chip.assign_x_y(ctx, x.into(), y.into())?;
+                    let is_valid = scalar_chip.and(ctx, &is_valid, &is_pk_on_curve)?;
+
                     let enable_skipping_invalid_signature = scalar_chip.assign_constant(ctx, (self.enable_skipping_invalid_signature as u64).into())?;
                     let enable_skipping_invalid_signature = scalar_chip.is_not_zero(ctx, &enable_skipping_invalid_signature)?;
-                    scalar_chip.one_or_one(ctx, &enable_skipping_invalid_signature, &is_pk_on_curve)?;
+                    scalar_chip.one_or_one(ctx, &enable_skipping_invalid_signature, &is_valid)?;
 
                     let pk_assigned = AssignedPublicKey {
                         point: pk_in_circuit,
@@ -386,12 +413,14 @@ mod tests {
             let aux_generator = C::CurveExt::random(OsRng).to_affine();
             let circuit = TestCircuitEcdsaVerify::<C, N> {
                 public_key: Value::known(public_key),
-                signature: Value::known((r, s)),
+                signature: Value::known((r.clone(), s.clone())),
                 msg_hash: Value::known(msg_hash),
                 aux_generator,
                 window_size: 4,
                 valid_input,
                 enable_skipping_invalid_signature,
+                r: r.clone(),
+                s: s.clone(),
                 ..Default::default()
             };
             let instance = vec![vec![]];

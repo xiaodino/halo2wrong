@@ -254,6 +254,13 @@ pub trait IntegerInstructions<
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<AssignedCondition<N>, Error>;
 
+    /// Check constraints that an [`AssignedInteger`] is not equal to zero
+    fn is_not_zero_without_reduce(
+        &self,
+        ctx: &mut RegionCtx<'_, N>,
+        a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
+    ) -> Result<AssignedCondition<N>, Error>;
+
     /// Enforces one of given two values is `1`
     /// `(a-1) * (b-1)  = 0`
     fn one_or_one(

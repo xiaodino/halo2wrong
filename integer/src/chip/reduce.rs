@@ -70,16 +70,30 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
-        let one = self.assign_constant(ctx, W::ONE)?;
-        let one = self.is_strict_equal(ctx, &one.clone(), &one)?;
         let exceeds_max_limb_value = a
             .limbs
             .iter()
             .any(|limb| limb.max_val() > self.rns.max_reduced_limb);
+
+        // Soft sanity check for completeness
+        // Reduction quotient is limited upto a dense single limb. It is quite possible
+        // to make it more than a single limb. However even single limb will
+        // support quite amount of lazy additions and make reduction process
+        // much easier.
+        let max_reduction_quotient = self.rns.max_reduced_limb.clone();
+        let max_reducible_value =
+            max_reduction_quotient * &self.rns.wrong_modulus + &self.rns.max_remainder;
+        let is_valid = self.assign_constant(ctx, ((a.max_val() < max_reducible_value) as u64).into())?;
+        let is_valid = self.is_not_zero_without_reduce(ctx, &is_valid)?;
+
         if exceeds_max_limb_value {
-            self.reduce(ctx, a)
+            let (result, is_reduce_succeeded) = self.reduce(ctx, a)?;
+            let is_valid = self.and(ctx, &is_valid, &is_reduce_succeeded)?;
+            Ok((result, is_valid))
         } else {
-            Ok((self.new_assigned_integer(a.limbs(), a.native().clone()), one))
+            let zero = self.assign_constant(ctx, W::ZERO)?;
+            let zero = self.is_strict_equal(ctx, &zero.clone(), &zero)?;
+            Ok((self.new_assigned_integer(a.limbs(), a.native().clone()), zero))
         }
     }
 
@@ -125,13 +139,27 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         ctx: &mut RegionCtx<'_, N>,
         a: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
     ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
-        let one = self.assign_constant(ctx, W::ONE)?;
-        let one = self.is_strict_equal(ctx, &one.clone(), &one)?;
         let exceeds_max_value = a.max_val() > self.rns.max_operand;
+
+        // Soft sanity check for completeness
+        // Reduction quotient is limited upto a dense single limb. It is quite possible
+        // to make it more than a single limb. However even single limb will
+        // support quite amount of lazy additions and make reduction process
+        // much easier.
+        let max_reduction_quotient = self.rns.max_reduced_limb.clone();
+        let max_reducible_value =
+            max_reduction_quotient * &self.rns.wrong_modulus + &self.rns.max_remainder;
+        let is_valid = self.assign_constant(ctx, ((a.max_val() < max_reducible_value) as u64).into())?;
+        let is_valid = self.is_not_zero_without_reduce(ctx, &is_valid)?;
+
         if exceeds_max_value {
-            self.reduce(ctx, a)
+            let (result, is_reduce_succeeded) = self.reduce(ctx, a)?;
+            let is_valid = self.and(ctx, &is_valid, &is_reduce_succeeded)?;
+            Ok((result, is_valid))
         } else {
-            Ok((self.new_assigned_integer(a.limbs(), a.native().clone()), one))
+            let zero = self.assign_constant(ctx, W::ZERO)?;
+            let zero = self.is_strict_equal(ctx, &zero.clone(), &zero)?;
+            Ok((self.new_assigned_integer(a.limbs(), a.native().clone()), zero))
         }
     }
 
@@ -155,6 +183,7 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
 
         // Change to try_assign_integer that has soft check
         let result = self.try_assign_integer(ctx, result.into(), Range::Remainder)?;
+
         let quotient = range_chip.assign(ctx, quotient, Self::sublimb_bit_len(), BIT_LEN_LIMB)?;
         let residues = witness
             .residues()

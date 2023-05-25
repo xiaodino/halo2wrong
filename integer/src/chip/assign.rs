@@ -3,6 +3,7 @@ use crate::rns::{Common, Integer};
 use crate::{AssignedInteger, AssignedLimb, UnassignedInteger};
 use halo2::halo2curves::ff::PrimeField;
 use halo2::plonk::Error;
+use halo2::circuit::Value;
 use maingate::{fe_to_big, halo2, AssignedCondition, MainGateInstructions, RangeInstructions, RegionCtx, Term};
 use num_bigint::BigUint as big_uint;
 use num_traits::One;
@@ -20,6 +21,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
     // ) -> Result<AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, Error> {
         let range_chip = self.range_chip();
         let main_gate = self.main_gate();
+
+        let mut is_valid = main_gate.assign_value(ctx, Value::known(N::ONE))?;
 
         let bit_len_limb_msb = match range {
             Range::Operand => self.rns.max_most_significant_operand_limb.bits(),
@@ -88,9 +91,11 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             .collect();
 
         let limbs_to_compose_len = main_gate.assign_constant(ctx, (!limbs_to_compose.is_empty() as u64).into())?;
+        is_valid = main_gate.and(ctx, &is_valid, &limbs_to_compose_len)?;
+
         let native = main_gate.compose(ctx, &limbs_to_compose, N::ZERO)?;
 
-        Ok((self.new_assigned_integer(&limbs.try_into().unwrap(), native), limbs_to_compose_len))
+        Ok((self.new_assigned_integer(&limbs.try_into().unwrap(), native), is_valid))
         // Ok(self.new_assigned_integer(&limbs.try_into().unwrap(), native))
     }
 
