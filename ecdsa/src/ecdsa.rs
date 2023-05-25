@@ -176,7 +176,6 @@ mod tests {
 
     use num_bigint::BigUint as big_uint;
 
-    // const BIT_LEN_LIMB: usize = 64;
     const BIT_LEN_LIMB: usize = 68;
     const NUMBER_OF_LIMBS: usize = 4;
 
@@ -284,8 +283,6 @@ mod tests {
                     let offset = 0;
                     let ctx = &mut RegionCtx::new(region, offset);
 
-                    let mut is_valid = scalar_chip.assign_constant(ctx, (1 as u64).into())?;
-
                     // r and s should be less than Remiander
                     let r = if self.valid_input {
                         let r = format!("{:?}", self.r);
@@ -299,10 +296,8 @@ mod tests {
                     } else {
                         scalar_chip.rns().max_remainder.clone() + big_uint::from(20u32)
                     };
-                    if r > scalar_chip.rns().max_remainder || s > scalar_chip.rns().max_remainder {
-                        is_valid = scalar_chip.assign_constant(ctx, (0 as u64).into())?;
-                    }
-                    let is_valid = scalar_chip.is_not_zero(ctx, &is_valid)?;
+                    let is_r_s_within_ranage = scalar_chip.assign_constant(ctx, ((r <= scalar_chip.rns().max_remainder && s <= scalar_chip.rns().max_remainder) as u64).into())?;
+                    let is_valid = scalar_chip.is_not_zero_without_reduce(ctx, &is_r_s_within_ranage)?;
 
                     let r = self.signature.map(|signature| signature.0);
                     let s = self.signature.map(|signature| signature.1);
