@@ -108,7 +108,9 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         integer: UnassignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
         range: Range,
     ) -> Result<(AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>, AssignedCondition<N>), Error> {
-        self.assign_integer_generic(ctx, integer, range)
+        let (result, succeeded) = self.assign_integer_generic(ctx, integer, range)?;
+        self.assert_in_field(ctx, &result)?;
+        Ok((result, succeeded))
     }
 
     fn assign_constant(
@@ -577,7 +579,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
     ) -> Result<(), Error> {
         let a = &self.reduce_if_limb_values_exceeds_reduced(ctx, a)?;
         let a = &self.reduce_if_max_operand_value_exceeds(ctx, a)?;
-        self.assert_in_field_generic(ctx, a)
+        let result = self.assert_in_field_generic(ctx, a)?;
+        Ok(())
     }
 
     fn sign(

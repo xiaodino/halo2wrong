@@ -30,6 +30,28 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             Range::Unreduced => 0,
         } as usize;
 
+
+        match range {
+            Range::Remainder => {
+                let _ = integer.clone().0.map(|int| {
+                    let max = self.rns.max_remainder.clone();
+                    let in_range = int.value() <= max;
+                    if !in_range {
+                        println!("max {:?} int {:?}", max, int.value().clone());
+                        println!("in_range {:?}", in_range);
+
+                    }
+                    // let in_range = main_gate.assign_constant(ctx, (in_range as u64).into()).unwrap();
+                    // is_valid = main_gate.and(ctx, &is_valid, &in_range).unwrap();
+                });
+            },
+            _ => {}
+        };
+
+
+        // let comparision_witness = integer.0.as_ref().map(|integer| integer.compare_to_modulus());
+
+
         let max_val_msb = (big_uint::one() << bit_len_limb_msb) - 1usize;
         let max_val = (big_uint::one() << BIT_LEN_LIMB) - 1usize;
 
