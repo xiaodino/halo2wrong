@@ -12,6 +12,8 @@ use maingate::{AssignedCondition, MainGate};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use num_bigint::BigUint as big_uint;
+
 mod add;
 mod mul;
 

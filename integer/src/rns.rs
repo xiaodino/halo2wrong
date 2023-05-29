@@ -366,8 +366,8 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
 
         // `w-1 = [w_0-1 , w_1, ... ] `
         let wrong_modulus_minus_one = decompose_big(
-            // wrong_modulus.clone() - 1usize,
-            big_uint::one(),
+            wrong_modulus.clone() - 1usize,
+            // big_uint::one(),
             NUMBER_OF_LIMBS,
             BIT_LEN_LIMB,
         )

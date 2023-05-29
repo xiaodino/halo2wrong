@@ -155,6 +155,7 @@ mod tests {
     use crate::maingate;
     use ecc::integer::Range;
     use ecc::maingate::big_to_fe;
+    use ecc::maingate::big_to_fe_without_modulus;
     use ecc::maingate::fe_to_big;
     use ecc::maingate::RegionCtx;
     use ecc::{EccConfig, GeneralEccChip};
@@ -168,13 +169,10 @@ mod tests {
     use integer::IntegerInstructions;
     use maingate::mock_prover_verify;
     use maingate::{MainGate, MainGateConfig, RangeChip, RangeConfig, RangeInstructions};
-    use num_traits::Num;
     use rand_core::OsRng;
 
     use std::fmt::{Debug};
     use std::marker::PhantomData;
-
-    use num_bigint::BigUint as big_uint;
 
     const BIT_LEN_LIMB: usize = 68;
     const NUMBER_OF_LIMBS: usize = 4;
@@ -233,8 +231,6 @@ mod tests {
 
         valid_input: bool,
         enable_skipping_invalid_signature: bool,
-        r: E::Scalar,
-        s: E::Scalar,
 
         _marker: PhantomData<N>,
     }
@@ -283,38 +279,17 @@ mod tests {
                     let offset = 0;
                     let ctx = &mut RegionCtx::new(region, offset);
 
-                    // r and s should be less than Remainder
-                    let r_test = if self.valid_input {
-                        let r = format!("{:?}", self.r);
-                        big_uint::from_str_radix(&r[2..], 16).unwrap()
+                    let is_valid = scalar_chip.assign_constant(ctx, (true as u64).into())?;
+                    let is_valid = scalar_chip.is_not_zero(ctx, &is_valid)?;
+
+                    let r = if self.valid_input {
+                        self.signature.map(|signature| signature.0)
                     } else {
-                        // Test data where r is larger than Remainder
-                        scalar_chip.rns().max_remainder.clone() + big_uint::from(20u32)
+                        let max_remainder = scalar_chip.rns().max_remainder.clone() + 10usize;
+                        let r: E::Scalar = big_to_fe_without_modulus(max_remainder);
+                        Value::known(r)
                     };
-                    let s_test = if self.valid_input {
-                        let s = format!("{:?}", self.s);
-                        big_uint::from_str_radix(&s[2..], 16).unwrap()
-                    } else {
-                        // Test data where s is larger than Remainder
-                        scalar_chip.rns().max_remainder.clone() + big_uint::from(20u32)
-                    };
-                    println!("scalar_chip.rns().max_remainder {:?}", scalar_chip.rns().max_remainder.clone());
 
-                    let invalid_signature = Value::known((self.r.clone(), self.s.clone()));
-                    let r = invalid_signature.map(|signature| signature.0 + signature.0);
-                    println!("r {:?}", r);
-                    let s = invalid_signature.map(|signature| signature.1);
-                    let integer_r = ecc_chip.new_unassigned_scalar(r);
-                    let (r_assigne, is_valid ) =
-                        scalar_chip.try_assign_integer(ctx, integer_r, Range::Remainder)?;
-
-                    // let is_r_s_within_ranage = scalar_chip.assign_constant(ctx, ((r <= scalar_chip.rns().max_remainder && s <= scalar_chip.rns().max_remainder) as u64).into())?;
-                    // let test = true;
-                    // let is_r_s_within_ranage = scalar_chip.assign_constant(ctx, (test as u64).into())?;
-
-                    // let is_valid = scalar_chip.is_not_zero_without_reduce(ctx, &is_r_s_within_ranage)?;
-
-                    let r = self.signature.map(|signature| signature.0);
                     let s = self.signature.map(|signature| signature.1);
                     let integer_r = ecc_chip.new_unassigned_scalar(r);
                     let integer_s = ecc_chip.new_unassigned_scalar(s);
@@ -404,8 +379,8 @@ mod tests {
         }
 
         fn generate_invalid_inputs<C: CurveAffine, N: FromUniformBytes<64> + Ord>() -> (C, C::Scalar, C::Scalar, C::Scalar) {
-            let (public_key, r, s, msg_hash) = generate_valid_inputs::<C, N>();
-            (public_key, r, s, msg_hash)
+            let (public_key, r, _, msg_hash) = generate_valid_inputs::<C, N>();
+            (public_key, r, r, msg_hash)
         }
 
         fn run<C: CurveAffine, N: FromUniformBytes<64> + Ord>(valid_input: bool, enable_skipping_invalid_signature: bool) {
@@ -424,8 +399,6 @@ mod tests {
                 window_size: 4,
                 valid_input,
                 enable_skipping_invalid_signature,
-                r: r.clone(),
-                s: s.clone(),
                 ..Default::default()
             };
             let instance = vec![vec![]];
@@ -433,8 +406,7 @@ mod tests {
             if valid_input || enable_skipping_invalid_signature {
                 assert_eq!(result, Ok(()));
             } else {
-                // assert!(result.is_err());
-                assert_eq!(result, Ok(()));
+                assert!(result.is_err());
             }
         }
 
