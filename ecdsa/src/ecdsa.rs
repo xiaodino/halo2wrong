@@ -415,19 +415,19 @@ mod tests {
         
         // Return Errors
         run::<Secp256k1, BnScalar>(false, false);
-        // run::<Secp256k1, PastaFp>(false, false);
-        // run::<Secp256k1, PastaFq>(false, false);
+        run::<Secp256k1, PastaFp>(false, false);
+        run::<Secp256k1, PastaFq>(false, false);
 
-        // run::<Secp256k1, BnScalar>(false, true);
-        // run::<Secp256k1, PastaFp>(false, true);
-        // run::<Secp256k1, PastaFq>(false, true);
+        run::<Secp256k1, BnScalar>(false, true);
+        run::<Secp256k1, PastaFp>(false, true);
+        run::<Secp256k1, PastaFq>(false, true);
 
-        // run::<Secp256k1, BnScalar>(true, false);
-        // run::<Secp256k1, PastaFp>(true, false);
-        // run::<Secp256k1, PastaFq>(true, false);
+        run::<Secp256k1, BnScalar>(true, false);
+        run::<Secp256k1, PastaFp>(true, false);
+        run::<Secp256k1, PastaFq>(true, false);
 
-        // run::<Secp256k1, BnScalar>(true, true);
-        // run::<Secp256k1, PastaFp>(true, true);
-        // run::<Secp256k1, PastaFq>(true, true);
+        run::<Secp256k1, BnScalar>(true, true);
+        run::<Secp256k1, PastaFp>(true, true);
+        run::<Secp256k1, PastaFq>(true, true);
     }
 }
