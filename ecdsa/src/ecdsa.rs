@@ -288,7 +288,7 @@ mod tests {
                     let integer_r = if self.valid_input {
                         ecc_chip.new_unassigned_scalar(r.clone())
                     } else {
-                        let max_reminder = scalar_chip.rns().max_remainder.clone() + 1usize;
+                        let max_reminder = scalar_chip.rns().max_remainder.clone();
                         ecc_chip.new_unassigned_big(max_reminder)
                     };
                     let integer_s = ecc_chip.new_unassigned_scalar(s);
