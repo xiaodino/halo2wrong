@@ -297,6 +297,7 @@ impl<F: PrimeField> RangeChip<F> {
 
         let (s_overflow, tag_overflow) = if !overflow_bit_lens.is_empty() {
             let s_overflow = meta.complex_selector();
+            println!("overflow_bit_lens {:?}", overflow_bit_lens);
             let tag_overflow = if overflow_bit_lens.len() > 1 {
                 let tag = meta.fixed_column();
                 Self::configure_lookup_with_column_tag(
