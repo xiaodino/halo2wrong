@@ -2,7 +2,7 @@ use super::{IntegerChip, Range};
 use crate::{AssignedInteger, PrimeField};
 use halo2::plonk::Error;
 use maingate::{
-    halo2, AssignedCondition, AssignedValue, CombinationOptionCommon, MainGateInstructions, RegionCtx, Term,
+    halo2, AssignedValue, CombinationOptionCommon, MainGateInstructions, RegionCtx, Term,
 };
 
 impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
@@ -12,7 +12,6 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         &self,
         ctx: &mut RegionCtx<'_, N>,
         input: &AssignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>,
-    // ) -> Result<(AssignedCondition<N>), Error> {
     ) -> Result<(), Error> {
         // Constraints for `NUMBER_OF_LIMBS = 4`
         // 0 = -c_0 + p_0 - a_0 + b_0 * R
@@ -52,7 +51,6 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
         // | c_i | a_i | b_i | b_(i-1) |
         // | c_n | a_n | -   | b_n     |
 
-        /*
         main_gate.apply(
             ctx,
             [
@@ -94,7 +92,6 @@ impl<W: PrimeField, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_L
             modulus_minus_one[last],
             CombinationOptionCommon::OneLinerAdd.into(),
         )?;
-        */
 
         Ok(())
     }

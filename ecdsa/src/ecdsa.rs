@@ -282,16 +282,15 @@ mod tests {
                     let is_valid = scalar_chip.assign_constant(ctx, (true as u64).into())?;
                     let is_valid = scalar_chip.is_not_zero(ctx, &is_valid)?;
 
-                    let r = if self.valid_input {
-                        self.signature.map(|signature| signature.0)
-                    } else {
-                        let max_remainder = scalar_chip.rns().max_remainder.clone() + 10usize;
-                        let r: E::Scalar = big_to_fe_without_modulus(max_remainder);
-                        Value::known(r)
-                    };
-
+                    let r = self.signature.map(|signature| signature.0);
                     let s = self.signature.map(|signature| signature.1);
-                    let integer_r = ecc_chip.new_unassigned_scalar(r);
+
+                    let integer_r = if self.valid_input {
+                        ecc_chip.new_unassigned_scalar(r.clone())
+                    } else {
+                        let max_reminder = scalar_chip.rns().max_remainder.clone() + 10usize;
+                        ecc_chip.new_unassigned_big(max_reminder)
+                    };
                     let integer_s = ecc_chip.new_unassigned_scalar(s);
                     let msg_hash = ecc_chip.new_unassigned_scalar(self.msg_hash);
 

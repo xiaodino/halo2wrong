@@ -99,6 +99,15 @@ impl<
         e.map(|e| Integer::from_fe(e, self.rns_scalar())).into()
     }
 
+    /// Assign integer for chip
+    pub fn new_unassigned_big(
+        &self,
+        e: big_uint,
+    ) -> UnassignedInteger<Emulated::Scalar, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB> {
+        let big = Integer::from_big(e, self.rns_scalar());
+        Value::known(big).into()
+    }
+
     /// Return `IntegerChip` for the base field of the EC
     pub fn base_field_chip(
         &self,
