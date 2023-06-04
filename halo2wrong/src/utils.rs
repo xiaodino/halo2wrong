@@ -30,10 +30,6 @@ pub fn big_to_fe<F: PrimeField>(e: big_uint) -> F {
     F::from_str_vartime(&e.to_str_radix(10)[..]).unwrap()
 }
 
-pub fn big_to_fe_without_modulus<F: PrimeField>(e: big_uint) -> F {
-    F::from_str_vartime(&e.to_str_radix(10)[..]).unwrap()
-}
-
 pub fn fe_to_big<F: PrimeField>(fe: F) -> big_uint {
     big_uint::from_bytes_le(fe.to_repr().as_ref())
 }
