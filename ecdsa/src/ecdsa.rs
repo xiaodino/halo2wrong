@@ -13,7 +13,7 @@ use maingate::{AssignedCondition, MainGateConfig, RangeConfig};
 
 #[derive(Clone, Debug)]
 pub struct EcdsaConfig {
-    main_gate_config: MainGateConfig,
+    pub main_gate_config: MainGateConfig,
     pub range_config: RangeConfig,
 }
 
