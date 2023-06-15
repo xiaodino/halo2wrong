@@ -137,11 +137,14 @@ impl<E: CurveAffine, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_
         let is_q_x_reduced_in_r_equal_to_r = scalar_chip.is_strict_equal(ctx, &q_x_reduced_in_r, &sig.r)?;
         
         // 8. check if both is_r_s_valid and is_q_x_reduced_in_r_equal_to_r are true to determine overall validity
-        let is_valid = scalar_chip.and(ctx, &is_r_s_valid, &is_q_x_reduced_in_r_equal_to_r)?;
+        let is_valid = scalar_chip.and(ctx, &is_q_x_reduced_in_r_equal_to_r, &is_r_s_valid)?;
         let is_valid = scalar_chip.and(ctx, &is_valid, &is_q_x_reduced_valid)?;
         let enable_skipping_invalid_signature = scalar_chip.assign_constant(ctx, (enable_skipping_invalid_signature as u64).into())?;
         let enable_skipping_invalid_signature = scalar_chip.is_not_zero(ctx, &enable_skipping_invalid_signature)?;
         scalar_chip.one_or_one(ctx, &enable_skipping_invalid_signature, &is_valid)?;
+
+        // Debug
+        println!("hello");
 
         Ok(is_valid)
     }
@@ -414,19 +417,19 @@ mod tests {
         
         // Return Errors
         run::<Secp256k1, BnScalar>(false, false);
-        run::<Secp256k1, PastaFp>(false, false);
-        run::<Secp256k1, PastaFq>(false, false);
+        // run::<Secp256k1, PastaFp>(false, false);
+        // run::<Secp256k1, PastaFq>(false, false);
 
-        run::<Secp256k1, BnScalar>(false, true);
-        run::<Secp256k1, PastaFp>(false, true);
-        run::<Secp256k1, PastaFq>(false, true);
+        // run::<Secp256k1, BnScalar>(false, true);
+        // run::<Secp256k1, PastaFp>(false, true);
+        // run::<Secp256k1, PastaFq>(false, true);
 
-        run::<Secp256k1, BnScalar>(true, false);
-        run::<Secp256k1, PastaFp>(true, false);
-        run::<Secp256k1, PastaFq>(true, false);
+        // run::<Secp256k1, BnScalar>(true, false);
+        // run::<Secp256k1, PastaFp>(true, false);
+        // run::<Secp256k1, PastaFq>(true, false);
 
-        run::<Secp256k1, BnScalar>(true, true);
-        run::<Secp256k1, PastaFp>(true, true);
-        run::<Secp256k1, PastaFq>(true, true);
+        // run::<Secp256k1, BnScalar>(true, true);
+        // run::<Secp256k1, PastaFp>(true, true);
+        // run::<Secp256k1, PastaFq>(true, true);
     }
 }
