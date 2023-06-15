@@ -143,9 +143,6 @@ impl<E: CurveAffine, N: PrimeField, const NUMBER_OF_LIMBS: usize, const BIT_LEN_
         let enable_skipping_invalid_signature = scalar_chip.is_not_zero(ctx, &enable_skipping_invalid_signature)?;
         scalar_chip.one_or_one(ctx, &enable_skipping_invalid_signature, &is_valid)?;
 
-        // Debug
-        println!("hello");
-
         Ok(is_valid)
     }
 }
@@ -417,19 +414,19 @@ mod tests {
         
         // Return Errors
         run::<Secp256k1, BnScalar>(false, false);
-        // run::<Secp256k1, PastaFp>(false, false);
-        // run::<Secp256k1, PastaFq>(false, false);
+        run::<Secp256k1, PastaFp>(false, false);
+        run::<Secp256k1, PastaFq>(false, false);
 
-        // run::<Secp256k1, BnScalar>(false, true);
-        // run::<Secp256k1, PastaFp>(false, true);
-        // run::<Secp256k1, PastaFq>(false, true);
+        run::<Secp256k1, BnScalar>(false, true);
+        run::<Secp256k1, PastaFp>(false, true);
+        run::<Secp256k1, PastaFq>(false, true);
 
-        // run::<Secp256k1, BnScalar>(true, false);
-        // run::<Secp256k1, PastaFp>(true, false);
-        // run::<Secp256k1, PastaFq>(true, false);
+        run::<Secp256k1, BnScalar>(true, false);
+        run::<Secp256k1, PastaFp>(true, false);
+        run::<Secp256k1, PastaFq>(true, false);
 
-        // run::<Secp256k1, BnScalar>(true, true);
-        // run::<Secp256k1, PastaFp>(true, true);
-        // run::<Secp256k1, PastaFq>(true, true);
+        run::<Secp256k1, BnScalar>(true, true);
+        run::<Secp256k1, PastaFp>(true, true);
+        run::<Secp256k1, PastaFq>(true, true);
     }
 }
